@@ -1,25 +1,22 @@
 class Memo {
   int? memoId;
+  String date; // yyyy-MM-dd
   String content;
-  String category;
-  String color;
-  String isCompleted;
-  String date;
+  int categoryId;
+  bool isDone;
 
   Memo({
     this.memoId,
-    required this.content,
-    required this.category,
-    required this.color,
-    required this.isCompleted,
     required this.date,
+    required this.content,
+    required this.categoryId,
+    required this.isDone,
   });
 
   Memo.fromMap(Map<String, dynamic> res)
-    : memoId = res['memo_id'],
+    : memoId = res['memoId'],
+      date = res['date'],
       content = res['content'],
-      category = res['category'],
-      color = res['color'],
-      isCompleted = res['isCompleted'],
-      date = res['date'];
+      categoryId = res['categoryId'],
+      isDone = res['isDone'] == 1;
 }
