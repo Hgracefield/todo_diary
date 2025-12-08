@@ -62,6 +62,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
 
           // ───────── 달력 ─────────
           Container(
+            height: 500,
             margin: EdgeInsets.symmetric(horizontal: 16),
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -129,7 +130,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
             child: Container(
               width: MediaQuery.of(context).size.width,
 
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -137,11 +138,20 @@ class _CalendarMemoState extends State<CalendarMemo> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ElevatedButton(
-                    onPressed: _selectedDay == null
-                        ? null
-                        : () => _addMemo(_selectedDay!),
-                    child: Text("메모 추가"),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: 45,
+                    child: ElevatedButton(
+                      onPressed: _selectedDay == null
+                          ? null
+                          : () => _addMemo(_selectedDay!),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadiusGeometry.circular(12),
+                        ),
+                      ),
+                      child: Text("메모 추가"),
+                    ),
                   ),
 
                   SizedBox(height: 12),
@@ -178,7 +188,6 @@ class _CalendarMemoState extends State<CalendarMemo> {
     );
   }
 
-  // ========== functions===========
   // ───────── 메모 추가 다이얼로그 ─────────
   void _addMemo(DateTime date) {
     final textController = TextEditingController();
@@ -194,7 +203,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "메모 추가",
+                    "메모 입력",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
                   ),
                   Text(
@@ -212,32 +221,53 @@ class _CalendarMemoState extends State<CalendarMemo> {
                 children: [
                   TextField(
                     controller: textController,
-                    decoration: const InputDecoration(hintText: "메모 입력"),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: "메모 입력",
+                    ),
                   ),
 
-                  RadioListTile(
-                    value: 1,
-                    groupValue: selectedCategoryId,
-                    title: Text("할 일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
+                  SizedBox(
+                    height: 30,
+                    child: RadioListTile(
+                      value: 1,
+                      groupValue: selectedCategoryId,
+                      title: Text(
+                        "할 일",
+                        style: TextStyle(color: Dcolor.stickerGreen),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onChanged: (v) =>
+                          setModalState(() => selectedCategoryId = v!),
+                    ),
                   ),
-                  RadioListTile(
-                    value: 2,
-                    groupValue: selectedCategoryId,
-                    title: Text("중요한 일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
+                  SizedBox(
+                    height: 30,
+                    child: RadioListTile(
+                      value: 2,
+                      groupValue: selectedCategoryId,
+                      title: Text(
+                        "중요한 일",
+                        style: TextStyle(color: Dcolor.stickerOrange),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onChanged: (v) =>
+                          setModalState(() => selectedCategoryId = v!),
+                    ),
                   ),
-                  RadioListTile(
-                    value: 3,
-                    groupValue: selectedCategoryId,
-                    title: Text("기념일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
+                  SizedBox(
+                    height: 30,
+                    child: RadioListTile(
+                      value: 3,
+                      groupValue: selectedCategoryId,
+                      title: Text(
+                        "기념일",
+                        style: TextStyle(color: Dcolor.stickerPink),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onChanged: (v) =>
+                          setModalState(() => selectedCategoryId = v!),
+                    ),
                   ),
                 ],
               ),
@@ -248,7 +278,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
                   onPressed: () => Navigator.pop(context),
 
                   style: TextButton.styleFrom(
-                    backgroundColor: Color.fromARGB(163, 217, 72, 120),
+                    backgroundColor: Dcolor.textColorGrey,
                     foregroundColor: Dcolor.defaultWhite,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadiusGeometry.circular(16),
@@ -289,6 +319,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
     );
   }
 
+  // ========== functions===========
   Future<void> loadAllMemos() async {
     final memos = await db.getAllMemos();
 

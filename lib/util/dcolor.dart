@@ -3,6 +3,7 @@ import 'package:my_todo_list_app/util/color_f.dart';
 
 class Dcolor {
   static Color homeBackgroundColor = hexToColor("A3D1C6", 0.1);
+  static Color homeTextColor = hexToColor("A3D1C6", 1);
   static Color homeTabBar = hexToColor("A3D1C6", 1);
   static Color defaultWhite = Colors.white;
   static Color defaultText = hexToColor("222222", 1);
@@ -15,5 +16,5 @@ class Dcolor {
   static Color stickerRemove = hexToColor("FF383C", 0.5);
   static Color stickerRemoveV2 = hexToColor("FF937E", 0.4);
 
-  // static Color buttonGreen = hexToColor("A3D1C6", 1);
+  static Color textColorGrey = hexToColor("777777", 1);
 }

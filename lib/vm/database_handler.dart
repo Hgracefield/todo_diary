@@ -53,8 +53,8 @@ class DatabaseHandler {
     await db.execute('''
       CREATE TABLE diary (
         diaryId INTEGER PRIMARY KEY AUTOINCREMENT,
-        diaryDate TEXT NOT NULL,
-        textContent TEXT NOT NULL,
+        diaryDate TEXT NOT NULL UNIQUE,
+        content TEXT NOT NULL,
         image BLOB NOT NULL
       )
     ''');
@@ -63,7 +63,7 @@ class DatabaseHandler {
     await db.execute('''
       CREATE TABLE memo (
        memoId INTEGER PRIMARY KEY AUTOINCREMENT,
-       date TEXT,
+       date TEXT NOT NULL,
        content TEXT,
        categoryId INTEGER,
        isDone INTEGER DEFAULT 0,
@@ -99,7 +99,7 @@ class DatabaseHandler {
     final db = await database;
     return db.insert('diary', {
       'diaryDate': diary.diaryDate,
-      'textContent': diary.textContent,
+      'content': diary.content,
       'image': diary.image,
     });
   }
@@ -114,12 +114,26 @@ class DatabaseHandler {
     final db = await database;
     return db.delete('diary', where: 'diaryId = ?', whereArgs: [id]);
   }
+  // 해당 날짜에 데이터가 있냐 판단
 
+  Future<Diary?> getDiaryByDate(String date) async {
+    final db = await database;
+    final result = await db.query(
+      'diary',
+      where: 'diaryDate = ?',
+      whereArgs: [date],
+    );
+
+    if (result.isEmpty) return null;
+    return Diary.fromMap(result.first);
+  }
+
+  // 해당 날짜에 데이터가 있냐 판단
   Future<int> updateDiaryText(int id, String text) async {
     final db = await database;
     return db.update(
       'diary',
-      {'textContent': text},
+      {'content': text},
       where: 'diaryId = ?',
       whereArgs: [id],
     );

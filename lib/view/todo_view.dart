@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:my_todo_list_app/util/sticker_color.dart';
+import 'package:my_todo_list_app/util/sub_functions.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
 import 'package:my_todo_list_app/model/memo.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
@@ -29,17 +30,16 @@ class _TodoViewState extends State<TodoView> {
     return grouped;
   }
 
-  // TODAY / TOMORROW / 날짜 문자열
-  String _dateTitle(DateTime date) {
+  String _dateLabel(DateTime date) {
     final today = DateTime.now();
     final base = DateTime(today.year, today.month, today.day);
     final diff = date.difference(base).inDays;
 
     if (diff == 0) return "TODAY";
     if (diff == 1) return "TOMORROW";
-    if (diff == 2) return "DAY AFTER TOMORROW";
+    if (diff == 2) return "THE DAY AFTER TOMORROW";
 
-    return "${date.month}/${date.day}";
+    return "";
   }
 
   @override
@@ -47,28 +47,46 @@ class _TodoViewState extends State<TodoView> {
     return Scaffold(
       backgroundColor: const Color(0x8BCBFFF3),
       appBar: AppBar(
-        title: Text('MEMO LIST', style: TextStyle(fontWeight: FontWeight.w500)),
         toolbarHeight: 100,
+        title: Text('MEMO LIST', style: TextStyle(fontWeight: FontWeight.w500)),
+
         // foregroundColor: Dcolor.defaultText,
         backgroundColor: const Color.fromARGB(16, 203, 255, 243),
       ),
-      body: FutureBuilder<List<Memo>>(
-        future: db.getAllMemos(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("등록된 메모가 없습니다"));
-          }
+      body: Column(
+        children: [
+          Expanded(
+            child: FutureBuilder<List<Memo>>(
+              future: db.getAllMemos(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(
+                    child: SizedBox(
+                      width: 320,
+                      child: Text(
+                        "등록된 메모가 없습니다",
+                        style: TextStyle(
+                          fontSize: 16,
+                          backgroundColor: Dcolor.stickerGreenV2,
+                        ),
+                      ),
+                    ),
+                  );
+                }
 
-          final grouped = _groupByDate(snapshot.data!);
-          final dates = grouped.keys.toList()..sort();
+                final grouped = _groupByDate(snapshot.data!);
+                final dates = grouped.keys.toList()..sort();
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: dates
-                .map((date) => _dateSection(date, grouped[date]!))
-                .toList(),
-          );
-        },
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: dates
+                      .map((date) => _dateSection(date, grouped[date]!))
+                      .toList(),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -86,8 +104,20 @@ class _TodoViewState extends State<TodoView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _dateTitle(date),
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            _dateLabel(date),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Dcolor.defaultText,
+            ),
+          ),
+          Text(
+            "${date.month}월 ${date.day}일",
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Dcolor.textColorGrey,
+            ),
           ),
           SizedBox(height: 12),
           ...memos.map((m) => _memoRow(m)),
@@ -148,7 +178,17 @@ class _TodoViewState extends State<TodoView> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Expanded(child: Text(m.content)),
+                        Expanded(
+                          child: Text(
+                            limitText(m.content),
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Dcolor.defaultText,
+                            ),
+                          ),
+                        ),
                         IconButton(
                           icon: Icon(
                             m.isDone
