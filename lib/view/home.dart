@@ -10,7 +10,8 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
+class _HomeState extends State<Home>
+    with SingleTickerProviderStateMixin {
   // property
   late TabController tabBotController;
 
@@ -18,6 +19,12 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     tabBotController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    tabBotController.dispose();
+    super.dispose();
   }
 
   @override

@@ -51,7 +51,10 @@ class _CalendarMemoState extends State<CalendarMemo> {
               children: [
                 Text(
                   "${_focusedDay.year}년 ${_focusedDay.month}월",
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Icon(Icons.more_horiz),
               ],
@@ -82,7 +85,8 @@ class _CalendarMemoState extends State<CalendarMemo> {
               focusedDay: _focusedDay,
               rowHeight: 70,
 
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              selectedDayPredicate: (day) =>
+                  isSameDay(_selectedDay, day),
 
               onDaySelected: (selectedDay, focusedDay) {
                 setState(() {
@@ -133,7 +137,9 @@ class _CalendarMemoState extends State<CalendarMemo> {
               padding: EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,7 +153,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
                           : () => _addMemo(_selectedDay!),
                       style: ElevatedButton.styleFrom(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadiusGeometry.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: Text("메모 추가"),
@@ -160,9 +166,12 @@ class _CalendarMemoState extends State<CalendarMemo> {
                     child: _selectedDay == null
                         ? Text("날짜를 선택하세요")
                         : FutureBuilder(
-                            future: db.getMemosByDate(_dateKey(_selectedDay!)),
+                            future: db.getMemosByDate(
+                              _dateKey(_selectedDay!),
+                            ),
                             builder: (context, snapshot) {
-                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                              if (!snapshot.hasData ||
+                                  snapshot.data!.isEmpty) {
                                 return Text("등록된 메모가 없습니다");
                               }
 
@@ -170,7 +179,9 @@ class _CalendarMemoState extends State<CalendarMemo> {
                                 children: snapshot.data!
                                     .map(
                                       (m) => Padding(
-                                        padding: EdgeInsets.only(bottom: 8),
+                                        padding: EdgeInsets.only(
+                                          bottom: 8,
+                                        ),
                                         child: Text("• ${m.content}"),
                                       ),
                                     )
@@ -204,7 +215,10 @@ class _CalendarMemoState extends State<CalendarMemo> {
                 children: [
                   Text(
                     "메모 입력",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   Text(
                     '${date.month}월 ${date.day}일',
@@ -237,8 +251,9 @@ class _CalendarMemoState extends State<CalendarMemo> {
                         style: TextStyle(color: Dcolor.stickerGreen),
                       ),
                       visualDensity: VisualDensity.compact,
-                      onChanged: (v) =>
-                          setModalState(() => selectedCategoryId = v!),
+                      onChanged: (v) => setModalState(
+                        () => selectedCategoryId = v!,
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -251,8 +266,9 @@ class _CalendarMemoState extends State<CalendarMemo> {
                         style: TextStyle(color: Dcolor.stickerOrange),
                       ),
                       visualDensity: VisualDensity.compact,
-                      onChanged: (v) =>
-                          setModalState(() => selectedCategoryId = v!),
+                      onChanged: (v) => setModalState(
+                        () => selectedCategoryId = v!,
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -265,8 +281,9 @@ class _CalendarMemoState extends State<CalendarMemo> {
                         style: TextStyle(color: Dcolor.stickerPink),
                       ),
                       visualDensity: VisualDensity.compact,
-                      onChanged: (v) =>
-                          setModalState(() => selectedCategoryId = v!),
+                      onChanged: (v) => setModalState(
+                        () => selectedCategoryId = v!,
+                      ),
                     ),
                   ),
                 ],
@@ -281,9 +298,12 @@ class _CalendarMemoState extends State<CalendarMemo> {
                     backgroundColor: Dcolor.textColorGrey,
                     foregroundColor: Dcolor.defaultWhite,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadiusGeometry.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 50, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 50,
+                      vertical: 12,
+                    ),
                   ),
                   child: Text("취소"),
                 ),
@@ -305,9 +325,12 @@ class _CalendarMemoState extends State<CalendarMemo> {
                     backgroundColor: Color.fromARGB(81, 49, 170, 51),
                     foregroundColor: Dcolor.defaultText,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadiusGeometry.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 50, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 50,
+                      vertical: 12,
+                    ),
                   ),
                   child: Text("저장"),
                 ),

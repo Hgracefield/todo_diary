@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:my_todo_list_app/view/home.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
+import 'package:flutter/foundation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = DatabaseHandler();
-  await db.forceResetDB();
+  if (kDebugMode) {
+    await db.forceResetDB();
+  }
 
   runApp(const MyApp());
 }
