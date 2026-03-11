@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:my_todo_list_app/model/memo.dart';
+import 'package:my_todo_list_app/model/todo_category_config.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
-import 'package:my_todo_list_app/util/sticker_color.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -117,7 +117,7 @@ class _CalendarMemoState extends State<CalendarMemo> {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: stickerColor(m.categoryId),
+                            color: todoCategoryAccentColor(m.categoryId),
                             shape: BoxShape.circle,
                           ),
                         );
@@ -241,48 +241,21 @@ class _CalendarMemoState extends State<CalendarMemo> {
                     ),
                   ),
 
-                  SizedBox(
-                    height: 30,
-                    child: RadioListTile(
-                      value: 1,
-                      groupValue: selectedCategoryId,
-                      title: Text(
-                        "할 일",
-                        style: TextStyle(color: Dcolor.stickerGreen),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (v) => setModalState(
-                        () => selectedCategoryId = v!,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 30,
-                    child: RadioListTile(
-                      value: 2,
-                      groupValue: selectedCategoryId,
-                      title: Text(
-                        "중요한 일",
-                        style: TextStyle(color: Dcolor.stickerOrange),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (v) => setModalState(
-                        () => selectedCategoryId = v!,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 30,
-                    child: RadioListTile(
-                      value: 3,
-                      groupValue: selectedCategoryId,
-                      title: Text(
-                        "기념일",
-                        style: TextStyle(color: Dcolor.stickerPink),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (v) => setModalState(
-                        () => selectedCategoryId = v!,
+                  ...todoCategoryConfigs.map(
+                    (category) => SizedBox(
+                      height: 30,
+                      child: RadioListTile<int>(
+                        value: category.id,
+                        groupValue: selectedCategoryId,
+                        title: Text(
+                          category.name,
+                          style: TextStyle(color: category.accentColor),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setModalState(() => selectedCategoryId = value);
+                        },
                       ),
                     ),
                   ),

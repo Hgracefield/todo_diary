@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:my_todo_list_app/util/sticker_color.dart';
-import 'package:my_todo_list_app/util/sub_functions.dart';
-import 'package:my_todo_list_app/vm/database_handler.dart';
 import 'package:my_todo_list_app/model/memo.dart';
+import 'package:my_todo_list_app/model/todo_category_config.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
+import 'package:my_todo_list_app/util/sub_functions.dart';
+import 'package:my_todo_list_app/view/calendar_diary.dart';
+import 'package:my_todo_list_app/vm/database_handler.dart';
 
 class TodoView extends StatefulWidget {
   const TodoView({super.key});
@@ -16,7 +17,6 @@ class TodoView extends StatefulWidget {
 class _TodoViewState extends State<TodoView> {
   final db = DatabaseHandler();
 
-  // 날짜 기준 Map으로 그룹핑
   Map<DateTime, List<Memo>> _groupByDate(List<Memo> memos) {
     final Map<DateTime, List<Memo>> grouped = {};
 
@@ -35,11 +35,11 @@ class _TodoViewState extends State<TodoView> {
     final base = DateTime(today.year, today.month, today.day);
     final diff = date.difference(base).inDays;
 
-    if (diff == 0) return "TODAY";
-    if (diff == 1) return "TOMORROW";
-    if (diff == 2) return "THE DAY AFTER TOMORROW";
+    if (diff == 0) return 'TODAY';
+    if (diff == 1) return 'TOMORROW';
+    if (diff == 2) return 'DAY AFTER TOMORROW';
 
-    return "";
+    return '';
   }
 
   @override
@@ -48,10 +48,25 @@ class _TodoViewState extends State<TodoView> {
       backgroundColor: const Color(0x8BCBFFF3),
       appBar: AppBar(
         toolbarHeight: 100,
-        title: Text('MEMO LIST', style: TextStyle(fontWeight: FontWeight.w500)),
-
-        // foregroundColor: Dcolor.defaultText,
+        title: const Text(
+          'MEMO LIST',
+          style: TextStyle(fontWeight: FontWeight.w500),
+        ),
         backgroundColor: const Color.fromARGB(16, 203, 255, 243),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CalendarDiary(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.menu_book_outlined),
+            tooltip: 'Diary',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -64,7 +79,7 @@ class _TodoViewState extends State<TodoView> {
                     child: SizedBox(
                       width: 320,
                       child: Text(
-                        "등록된 메모가 없습니다",
+                        'No memos yet.',
                         style: TextStyle(
                           fontSize: 16,
                           backgroundColor: Dcolor.stickerGreenV2,
@@ -91,11 +106,10 @@ class _TodoViewState extends State<TodoView> {
     );
   }
 
-  // ✅ 날짜 섹션
   Widget _dateSection(DateTime date, List<Memo> memos) {
     return Container(
-      margin: EdgeInsets.only(bottom: 16),
-      padding: EdgeInsets.fromLTRB(16, 30, 16, 20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
       decoration: BoxDecoration(
         color: Dcolor.defaultWhite,
         borderRadius: BorderRadius.circular(14),
@@ -112,32 +126,30 @@ class _TodoViewState extends State<TodoView> {
             ),
           ),
           Text(
-            "${date.month}월 ${date.day}일",
+            '${date.month}/${date.day}',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: Dcolor.textColorGrey,
             ),
           ),
-          SizedBox(height: 12),
-          ...memos.map((m) => _memoRow(m)),
+          const SizedBox(height: 12),
+          ...memos.map(_memoRow),
         ],
       ),
     );
   }
 
-  // ✅ 메모 row (상태 변경 가능)
   Widget _memoRow(Memo m) {
     return GestureDetector(
       onTap: () => _editMemo(m),
-
       child: Container(
-        margin: EdgeInsets.only(bottom: 15),
+        margin: const EdgeInsets.only(bottom: 15),
         height: 55,
         child: Slidable(
           key: ValueKey(m.memoId),
           endActionPane: ActionPane(
-            motion: BehindMotion(),
+            motion: const BehindMotion(),
             extentRatio: 0.3,
             children: [
               SlidableAction(
@@ -146,7 +158,6 @@ class _TodoViewState extends State<TodoView> {
                   await db.deleteMemo(m.memoId!);
                   setState(() {});
                 },
-
                 backgroundColor: Dcolor.stickerRemove,
                 borderRadius: BorderRadius.circular(10),
                 label: 'Delete',
@@ -156,7 +167,7 @@ class _TodoViewState extends State<TodoView> {
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: stickerColorV2(m.categoryId),
+              color: todoCategoryBackgroundColor(m.categoryId),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -164,8 +175,8 @@ class _TodoViewState extends State<TodoView> {
                 Container(
                   width: 6,
                   decoration: BoxDecoration(
-                    color: stickerColor(m.categoryId),
-                    borderRadius: BorderRadius.only(
+                    color: todoCategoryAccentColor(m.categoryId),
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(10),
                       bottomLeft: Radius.circular(10),
                     ),
@@ -173,7 +184,7 @@ class _TodoViewState extends State<TodoView> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(10, 0, 10, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -194,7 +205,7 @@ class _TodoViewState extends State<TodoView> {
                             m.isDone
                                 ? Icons.check_circle_rounded
                                 : Icons.circle_outlined,
-                            color: stickerColor(m.categoryId),
+                            color: todoCategoryAccentColor(m.categoryId),
                             size: 33,
                           ),
                           onPressed: () async {
@@ -215,13 +226,10 @@ class _TodoViewState extends State<TodoView> {
         ),
       ),
     );
-  } // build
+  }
 
-  //  ====== functions =======
-  _editMemo(Memo memo) {
-    final TextEditingController textController = TextEditingController(
-      text: memo.content,
-    );
+  void _editMemo(Memo memo) {
+    final textController = TextEditingController(text: memo.content);
     int selectedCategoryId = memo.categoryId;
 
     showDialog(
@@ -229,17 +237,18 @@ class _TodoViewState extends State<TodoView> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final memoDate = DateTime.parse(memo.date);
+
             return AlertDialog(
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '메모 수정',
+                  const Text(
+                    'Edit Memo',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
                   ),
                   Text(
-                    "${DateTime.parse(memo.date).month}월 "
-                    "${DateTime.parse(memo.date).day}일",
+                    '${memoDate.month}/${memoDate.day}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFF666666),
@@ -252,41 +261,30 @@ class _TodoViewState extends State<TodoView> {
                 children: [
                   TextField(
                     controller: textController,
-                    decoration: const InputDecoration(hintText: "메모 입력"),
+                    decoration: const InputDecoration(hintText: 'Enter memo'),
                   ),
-
-                  RadioListTile(
-                    value: 1,
-                    groupValue: selectedCategoryId,
-                    title: const Text("할 일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
-                  ),
-                  RadioListTile(
-                    value: 2,
-                    groupValue: selectedCategoryId,
-                    title: const Text("중요한 일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
-                  ),
-                  RadioListTile(
-                    value: 3,
-                    groupValue: selectedCategoryId,
-                    title: const Text("기념일"),
-                    visualDensity: VisualDensity.compact,
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategoryId = v!),
+                  ...todoCategoryConfigs.map(
+                    (category) => RadioListTile<int>(
+                      value: category.id,
+                      groupValue: selectedCategoryId,
+                      title: Text(
+                        category.name,
+                        style: TextStyle(color: category.accentColor),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setModalState(() => selectedCategoryId = value);
+                      },
+                    ),
                   ),
                 ],
               ),
-
               actionsAlignment: MainAxisAlignment.center,
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("취소"),
+                  child: const Text('Cancel'),
                 ),
                 const SizedBox(width: 10),
                 TextButton(
@@ -294,12 +292,16 @@ class _TodoViewState extends State<TodoView> {
                     final text = textController.text.trim();
                     if (text.isEmpty) return;
 
-                    await db.updateMemo(memo.memoId!, text, selectedCategoryId);
+                    await db.updateMemo(
+                      memo.memoId!,
+                      text,
+                      selectedCategoryId,
+                    );
 
                     Navigator.pop(context);
                     setState(() {});
                   },
-                  child: const Text("수정"),
+                  child: const Text('Save'),
                 ),
               ],
             );
@@ -308,4 +310,4 @@ class _TodoViewState extends State<TodoView> {
       },
     );
   }
-} // class
+}

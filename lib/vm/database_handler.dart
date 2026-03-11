@@ -1,10 +1,12 @@
 import 'dart:typed_data';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'package:my_todo_list_app/model/category.dart';
 import 'package:my_todo_list_app/model/diary.dart';
 import 'package:my_todo_list_app/model/memo.dart';
+import 'package:my_todo_list_app/model/todo_category_config.dart';
 
 class DatabaseHandler {
   static final DatabaseHandler _instance = DatabaseHandler._internal();
@@ -13,18 +15,15 @@ class DatabaseHandler {
 
   static Database? _db;
 
-  // ---------------- DATABASE INIT ----------------
   Future<void> forceResetDB() async {
     if (_db != null) {
-      await _db!.close(); // ✅ 열려 있던 DB 닫기
-      _db = null; // ✅ 캐시 제거
+      await _db!.close();
+      _db = null;
     }
 
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'my_todo_app2.db');
-
     await deleteDatabase(path);
-    print('🔥 DB FILE DELETED AND RESET');
   }
 
   Future<Database> get database async {
@@ -35,12 +34,15 @@ class DatabaseHandler {
 
   Future<Database> _initDB() async {
     final path = join(await getDatabasesPath(), 'my_todo_app2.db');
-
-    return openDatabase(path, version: 1, onCreate: _onCreate);
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // CATEGORY
     await db.execute('''
       CREATE TABLE category (
         categoryId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +51,6 @@ class DatabaseHandler {
       )
     ''');
 
-    // DIARY
     await db.execute('''
       CREATE TABLE diary (
         diaryId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,20 +60,61 @@ class DatabaseHandler {
       )
     ''');
 
-    // MEMO (Calendar / Todo용)
     await db.execute('''
-      CREATE TABLE memo (
-       memoId INTEGER PRIMARY KEY AUTOINCREMENT,
-       date TEXT NOT NULL,
-       content TEXT,
-       categoryId INTEGER,
-       isDone INTEGER DEFAULT 0,
-       FOREIGN KEY (categoryId) REFERENCES category(categoryId)
+      CREATE TABLE diary_image (
+        diaryImageId INTEGER PRIMARY KEY AUTOINCREMENT,
+        diaryId INTEGER NOT NULL,
+        image BLOB NOT NULL,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (diaryId) REFERENCES diary(diaryId)
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE memo (
+        memoId INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        content TEXT,
+        categoryId INTEGER,
+        isDone INTEGER DEFAULT 0,
+        FOREIGN KEY (categoryId) REFERENCES category(categoryId)
+      )
+    ''');
+
+    for (final category in todoCategoryConfigs) {
+      await db.insert('category', {
+        'categoryId': category.id,
+        'categoryName': category.name,
+        'categoryColor': category.colorName,
+      });
+    }
   }
 
-  // ================= CATEGORY =================
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS diary_image (
+          diaryImageId INTEGER PRIMARY KEY AUTOINCREMENT,
+          diaryId INTEGER NOT NULL,
+          image BLOB NOT NULL,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (diaryId) REFERENCES diary(diaryId)
+        )
+      ''');
+
+      final diaries = await db.query('diary');
+      for (final diary in diaries) {
+        final image = diary['image'];
+        if (image is Uint8List && image.isNotEmpty) {
+          await db.insert('diary_image', {
+            'diaryId': diary['diaryId'],
+            'image': image,
+            'sortOrder': 0,
+          });
+        }
+      }
+    }
+  }
 
   Future<int> insertCategory(Category category) async {
     final db = await database;
@@ -93,14 +135,17 @@ class DatabaseHandler {
     return db.delete('category', where: 'categoryId = ?', whereArgs: [id]);
   }
 
-  // ================= DIARY =================
-
-  Future<int> insertDiary(Diary diary) async {
+  Future<int> insertDiary(Diary diary, {List<Uint8List>? images}) async {
     final db = await database;
-    return db.insert('diary', {
-      'diaryDate': diary.diaryDate,
-      'content': diary.content,
-      'image': diary.image,
+    return db.transaction((txn) async {
+      final diaryId = await txn.insert('diary', {
+        'diaryDate': diary.diaryDate,
+        'content': diary.content,
+        'image': diary.image,
+      });
+
+      await _replaceDiaryImagesTxn(txn, diaryId, images ?? <Uint8List>[]);
+      return diaryId;
     });
   }
 
@@ -112,9 +157,11 @@ class DatabaseHandler {
 
   Future<int> deleteDiary(int id) async {
     final db = await database;
-    return db.delete('diary', where: 'diaryId = ?', whereArgs: [id]);
+    return db.transaction((txn) async {
+      await txn.delete('diary_image', where: 'diaryId = ?', whereArgs: [id]);
+      return txn.delete('diary', where: 'diaryId = ?', whereArgs: [id]);
+    });
   }
-  // 해당 날짜에 데이터가 있냐 판단
 
   Future<Diary?> getDiaryByDate(String date) async {
     final db = await database;
@@ -128,7 +175,6 @@ class DatabaseHandler {
     return Diary.fromMap(result.first);
   }
 
-  // 해당 날짜에 데이터가 있냐 판단
   Future<int> updateDiaryText(int id, String text) async {
     final db = await database;
     return db.update(
@@ -149,7 +195,47 @@ class DatabaseHandler {
     );
   }
 
-  // ================= MEMO (Calendar / Todo) =================
+  Future<void> updateDiary(int id, String content, List<Uint8List> images) async {
+    final db = await database;
+    final coverImage = images.isEmpty ? Uint8List(0) : images.first;
+
+    await db.transaction((txn) async {
+      await txn.update(
+        'diary',
+        {'content': content, 'image': coverImage},
+        where: 'diaryId = ?',
+        whereArgs: [id],
+      );
+      await _replaceDiaryImagesTxn(txn, id, images);
+    });
+  }
+
+  Future<List<Uint8List>> getDiaryImages(int diaryId) async {
+    final db = await database;
+    final result = await db.query(
+      'diary_image',
+      where: 'diaryId = ?',
+      whereArgs: [diaryId],
+      orderBy: 'sortOrder ASC, diaryImageId ASC',
+    );
+    return result.map((row) => row['image'] as Uint8List).toList();
+  }
+
+  Future<void> _replaceDiaryImagesTxn(
+    Transaction txn,
+    int diaryId,
+    List<Uint8List> images,
+  ) async {
+    await txn.delete('diary_image', where: 'diaryId = ?', whereArgs: [diaryId]);
+
+    for (var i = 0; i < images.length; i++) {
+      await txn.insert('diary_image', {
+        'diaryId': diaryId,
+        'image': images[i],
+        'sortOrder': i,
+      });
+    }
+  }
 
   Future<int> insertMemo(String content, String date, int categoryId) async {
     final db = await database;
