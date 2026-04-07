@@ -17,7 +17,6 @@ class _CalendarDiaryState extends State<CalendarDiary> {
 
   DateTime focusedDay = DateTime.now();
   DateTime? selectedDay = DateTime.now();
-  bool showTip = true;
   bool isLoading = true;
   Map<String, Diary> diaryMap = {};
 
@@ -64,6 +63,10 @@ class _CalendarDiaryState extends State<CalendarDiary> {
     return diaryMap[_dateKey(date)];
   }
 
+  String _monthDiaryTitle(DateTime date) {
+    return '${date.month}월의 다이어리';
+  }
+
   void _goToTodoPage() {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
@@ -84,12 +87,12 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                     Row(
                       children: [
                         Text(
-                          'Month ${focusedDay.month}',
+                          _monthDiaryTitle(focusedDay),
                           style: TextStyle(
-                            fontSize: 38,
+                            fontSize: 32,
                             fontWeight: FontWeight.w800,
                             color: Dcolor.defaultText,
-                            letterSpacing: -1.5,
+                            letterSpacing: -1,
                           ),
                         ),
                         const Spacer(),
@@ -262,57 +265,14 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (showTip)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+              SizedBox(
+                width: double.infinity,
+                child: Text(
+                  '해당 일자를 클릭하면 일기쓰기 페이지로 이동합니다.',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFFD9D9D9),
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F4F2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.lightbulb, color: Color(0xFFF3C316)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Calendar tip',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Dcolor.defaultText,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            showTip = false;
-                          });
-                        },
-                        icon: Icon(Icons.close, color: Dcolor.textColorGrey),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Icon(Icons.home_outlined, color: Color(0xFF7A8087)),
-                    Icon(
-                      Icons.calendar_month_outlined,
-                      color: Color(0xFF7A8087),
-                    ),
-                    Icon(
-                      Icons.auto_awesome_mosaic_outlined,
-                      color: Color(0xFF7A8087),
-                    ),
-                  ],
                 ),
               ),
             ],

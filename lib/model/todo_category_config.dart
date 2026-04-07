@@ -21,9 +21,9 @@ final List<TodoCategoryConfig> todoCategoryConfigs = [
   TodoCategoryConfig(
     id: 1,
     name: '기본',
-    colorName: 'green',
-    accentColor: Dcolor.stickerGreen,
-    backgroundColor: Dcolor.stickerGreenV2,
+    colorName: 'sky',
+    accentColor: const Color(0xFF76C7FF),
+    backgroundColor: const Color(0xFFDDF2FF),
   ),
   TodoCategoryConfig(
     id: 2,
@@ -34,10 +34,10 @@ final List<TodoCategoryConfig> todoCategoryConfigs = [
   ),
   TodoCategoryConfig(
     id: 3,
-    name: '기타',
-    colorName: 'pink',
-    accentColor: Dcolor.stickerPink,
-    backgroundColor: Dcolor.stickerPinkV2,
+    name: '회사',
+    colorName: 'blue',
+    accentColor: const Color(0xFF4D7CFE),
+    backgroundColor: const Color(0xFFDDE6FF),
   ),
 ];
 

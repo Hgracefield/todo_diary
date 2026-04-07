@@ -36,7 +36,7 @@ class DatabaseHandler {
     final path = join(await getDatabasesPath(), 'my_todo_app2.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -74,6 +74,8 @@ class DatabaseHandler {
       CREATE TABLE memo (
         memoId INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
+        startDate TEXT NOT NULL,
+        endDate TEXT NOT NULL,
         content TEXT,
         categoryId INTEGER,
         isDone INTEGER DEFAULT 0,
@@ -113,6 +115,20 @@ class DatabaseHandler {
           });
         }
       }
+    }
+
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE memo ADD COLUMN startDate TEXT NOT NULL DEFAULT ""',
+      );
+      await db.execute(
+        'ALTER TABLE memo ADD COLUMN endDate TEXT NOT NULL DEFAULT ""',
+      );
+      await db.execute('''
+        UPDATE memo
+        SET startDate = CASE WHEN startDate = '' THEN date ELSE startDate END,
+            endDate = CASE WHEN endDate = '' THEN date ELSE endDate END
+      ''');
     }
   }
 
@@ -195,7 +211,11 @@ class DatabaseHandler {
     );
   }
 
-  Future<void> updateDiary(int id, String content, List<Uint8List> images) async {
+  Future<void> updateDiary(
+    int id,
+    String content,
+    List<Uint8List> images,
+  ) async {
     final db = await database;
     final coverImage = images.isEmpty ? Uint8List(0) : images.first;
 
@@ -237,21 +257,43 @@ class DatabaseHandler {
     }
   }
 
-  Future<int> insertMemo(String content, String date, int categoryId) async {
+  Future<int> insertMemo(
+    String content,
+    String date,
+    int categoryId, {
+    String? startDate,
+    String? endDate,
+  }) async {
     final db = await database;
+    final actualStartDate = startDate ?? date;
+    final actualEndDate = endDate ?? date;
     return db.insert('memo', {
       'content': content,
       'date': date,
+      'startDate': actualStartDate,
+      'endDate': actualEndDate,
       'categoryId': categoryId,
       'isDone': 0,
     });
   }
 
-  Future<int> updateMemo(int id, String content, int categoryId) async {
+  Future<int> updateMemo(
+    int id,
+    String content,
+    int categoryId, {
+    String? startDate,
+    String? endDate,
+  }) async {
     final db = await database;
     return db.update(
       'memo',
-      {'content': content, 'categoryId': categoryId},
+      {
+        'content': content,
+        'categoryId': categoryId,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+        if (startDate != null) 'date': startDate,
+      },
       where: 'memoId = ?',
       whereArgs: [id],
     );
@@ -269,13 +311,22 @@ class DatabaseHandler {
 
   Future<List<Memo>> getMemosByDate(String date) async {
     final db = await database;
-    final result = await db.query('memo', where: 'date = ?', whereArgs: [date]);
+    final result = await db.query(
+      'memo',
+      where:
+          '(startDate IS NOT NULL AND endDate IS NOT NULL AND startDate <= ? AND endDate >= ?) OR date = ?',
+      whereArgs: [date, date, date],
+      orderBy: 'startDate ASC, endDate ASC, memoId DESC',
+    );
     return result.map((e) => Memo.fromMap(e)).toList();
   }
 
   Future<List<Memo>> getAllMemos() async {
     final db = await database;
-    final result = await db.query('memo', orderBy: 'date DESC');
+    final result = await db.query(
+      'memo',
+      orderBy: 'startDate DESC, endDate DESC, memoId DESC',
+    );
     return result.map((e) => Memo.fromMap(e)).toList();
   }
 

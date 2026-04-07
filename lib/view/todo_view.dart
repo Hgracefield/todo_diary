@@ -99,14 +99,23 @@ class _TodoViewState extends State<TodoView> {
                   );
                 }
 
-                final grouped = _groupByDate(snapshot.data!);
+                final memos = snapshot.data!;
+                final grouped = _groupByDate(memos);
                 final dates = grouped.keys.toList()..sort();
+                final completedMemos =
+                    memos.where((memo) => memo.isDone).toList()..sort(
+                      (a, b) => DateTime.parse(
+                        a.date,
+                      ).compareTo(DateTime.parse(b.date)),
+                    );
 
                 return ListView(
                   padding: const EdgeInsets.all(16),
-                  children: dates
-                      .map((date) => _dateSection(date, grouped[date]!))
-                      .toList(),
+                  children: [
+                    ...dates.map((date) => _dateSection(date, grouped[date]!)),
+                    if (completedMemos.isNotEmpty)
+                      _completedSection(completedMemos),
+                  ],
                 );
               },
             ),
@@ -144,13 +153,49 @@ class _TodoViewState extends State<TodoView> {
             ),
           ),
           const SizedBox(height: 12),
-          ...memos.map(_memoRow),
+          ...memos.map((memo) => _memoRow(memo)),
         ],
       ),
     );
   }
 
-  Widget _memoRow(Memo m) {
+  Widget _completedSection(List<Memo> memos) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+      decoration: BoxDecoration(
+        color: Dcolor.defaultWhite,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '완료',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Dcolor.defaultText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...memos.map((memo) => _memoRow(memo, isCompletedSection: true)),
+        ],
+      ),
+    );
+  }
+
+  Widget _memoRow(Memo m, {bool isCompletedSection = false}) {
+    final backgroundColor = isCompletedSection
+        ? todoCategoryBackgroundColor(m.categoryId).withValues(alpha: 0.2)
+        : todoCategoryBackgroundColor(m.categoryId);
+    final accentColor = isCompletedSection
+        ? todoCategoryAccentColor(m.categoryId).withValues(alpha: 0.35)
+        : todoCategoryAccentColor(m.categoryId);
+    final textColor = isCompletedSection
+        ? Dcolor.defaultText.withValues(alpha: 0.45)
+        : Dcolor.defaultText;
+
     return GestureDetector(
       onTap: () => _editMemo(m),
       child: Container(
@@ -177,7 +222,7 @@ class _TodoViewState extends State<TodoView> {
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: todoCategoryBackgroundColor(m.categoryId),
+              color: backgroundColor,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -185,7 +230,7 @@ class _TodoViewState extends State<TodoView> {
                 Container(
                   width: 6,
                   decoration: BoxDecoration(
-                    color: todoCategoryAccentColor(m.categoryId),
+                    color: accentColor,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(10),
                       bottomLeft: Radius.circular(10),
@@ -204,10 +249,7 @@ class _TodoViewState extends State<TodoView> {
                             limitText(m.content),
                             maxLines: 1,
                             overflow: TextOverflow.clip,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: Dcolor.defaultText,
-                            ),
+                            style: TextStyle(fontSize: 15, color: textColor),
                           ),
                         ),
                         IconButton(
@@ -215,7 +257,7 @@ class _TodoViewState extends State<TodoView> {
                             m.isDone
                                 ? Icons.check_circle_rounded
                                 : Icons.circle_outlined,
-                            color: todoCategoryAccentColor(m.categoryId),
+                            color: accentColor,
                             size: 33,
                           ),
                           onPressed: () async {

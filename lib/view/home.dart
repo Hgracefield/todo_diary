@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
-import 'package:my_todo_list_app/view/calendar_memo.dart';
-import 'package:my_todo_list_app/view/todo_view.dart';
+import 'package:my_todo_list_app/view/calendar_schedule.dart';
+import 'package:my_todo_list_app/view/dashboard_view.dart';
+import 'package:my_todo_list_app/view/insight_view.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -10,15 +11,14 @@ class Home extends StatefulWidget {
   State<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home>
-    with SingleTickerProviderStateMixin {
+class _HomeState extends State<Home> with SingleTickerProviderStateMixin {
   // property
   late TabController tabBotController;
 
   @override
   void initState() {
     super.initState();
-    tabBotController = TabController(length: 2, vsync: this);
+    tabBotController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -34,7 +34,7 @@ class _HomeState extends State<Home>
       // appBar: AppBar(),
       body: TabBarView(
         controller: tabBotController,
-        children: [TodoView(), CalendarMemo()],
+        children: [DashboardView(), CalendarSchedule(), InsightView()],
       ),
       bottomNavigationBar: Container(
         color: const Color(0x8BCBFFF3),
@@ -47,8 +47,12 @@ class _HomeState extends State<Home>
           indicatorWeight: 5,
           indicatorSize: TabBarIndicatorSize.tab,
           tabs: [
-            Tab(icon: Icon(Icons.home_outlined, size: 30)),
-            Tab(icon: Icon(Icons.calendar_today_outlined, size: 30)),
+            Tab(icon: Icon(Icons.home_outlined, size: 28), text: '홈'),
+            Tab(
+              icon: Icon(Icons.calendar_today_outlined, size: 28),
+              text: '캘린더',
+            ),
+            Tab(icon: Icon(Icons.insights_outlined, size: 28), text: 'Insight'),
           ],
         ),
       ),
