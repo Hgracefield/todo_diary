@@ -52,9 +52,7 @@ class _CalendarDiaryState extends State<CalendarDiary> {
   Future<void> _openDiaryEditor(DateTime date) async {
     final saved = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (context) => DiaryEditorView(date: date),
-      ),
+      MaterialPageRoute(builder: (context) => DiaryEditorView(date: date)),
     );
 
     if (saved == true) {
@@ -64,6 +62,10 @@ class _CalendarDiaryState extends State<CalendarDiary> {
 
   Diary? _diaryForDate(DateTime date) {
     return diaryMap[_dateKey(date)];
+  }
+
+  void _goToTodoPage() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -91,13 +93,24 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                           ),
                         ),
                         const Spacer(),
-                        IconButton(
-                          onPressed: () {},
+                        PopupMenuButton<String>(
+                          tooltip: 'Open menu',
                           icon: Icon(
                             Icons.more_horiz,
                             color: Dcolor.textColorGrey,
                             size: 28,
                           ),
+                          onSelected: (value) {
+                            if (value == 'todo') {
+                              _goToTodoPage();
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'todo',
+                              child: Text('todo'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -118,7 +131,8 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                                 focusedDay: focusedDay,
                                 currentDay: DateTime.now(),
                                 headerVisible: false,
-                                availableGestures: AvailableGestures.horizontalSwipe,
+                                availableGestures:
+                                    AvailableGestures.horizontalSwipe,
                                 rowHeight: 92,
                                 sixWeekMonthsEnforced: true,
                                 selectedDayPredicate: (day) =>
@@ -188,7 +202,8 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                                       'Sat',
                                     ];
                                     final label = labels[day.weekday % 7];
-                                    final isWeekend = day.weekday == DateTime.sunday ||
+                                    final isWeekend =
+                                        day.weekday == DateTime.sunday ||
                                         day.weekday == DateTime.saturday;
 
                                     return Center(
@@ -250,7 +265,10 @@ class _CalendarDiaryState extends State<CalendarDiary> {
               if (showTip)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF4F4F2),
                     borderRadius: BorderRadius.circular(20),
@@ -286,8 +304,14 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: const [
                     Icon(Icons.home_outlined, color: Color(0xFF7A8087)),
-                    Icon(Icons.calendar_month_outlined, color: Color(0xFF7A8087)),
-                    Icon(Icons.auto_awesome_mosaic_outlined, color: Color(0xFF7A8087)),
+                    Icon(
+                      Icons.calendar_month_outlined,
+                      color: Color(0xFF7A8087),
+                    ),
+                    Icon(
+                      Icons.auto_awesome_mosaic_outlined,
+                      color: Color(0xFF7A8087),
+                    ),
                   ],
                 ),
               ),
@@ -319,10 +343,10 @@ class _CalendarCell extends StatelessWidget {
     final textColor = isOutside
         ? const Color(0xFFD1D5DB)
         : day.weekday == DateTime.sunday
-            ? const Color(0xFFF26D6D)
-            : day.weekday == DateTime.saturday
-                ? const Color(0xFF4D94FF)
-                : const Color(0xFF20242A);
+        ? const Color(0xFFF26D6D)
+        : day.weekday == DateTime.saturday
+        ? const Color(0xFF4D94FF)
+        : const Color(0xFF20242A);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
@@ -333,7 +357,9 @@ class _CalendarCell extends StatelessWidget {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: isSelected || isToday ? const Color(0xFF2D9CFF) : Colors.transparent,
+              color: isSelected || isToday
+                  ? const Color(0xFF2D9CFF)
+                  : Colors.transparent,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,

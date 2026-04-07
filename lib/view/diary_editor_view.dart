@@ -133,6 +133,10 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
     });
   }
 
+  void _goToTodoPage() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateLabel =
@@ -170,6 +174,24 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                         _CircleIconButton(
                           icon: Icons.edit_outlined,
                           onTap: _pickImages,
+                        ),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          tooltip: 'Open menu',
+                          onSelected: (value) {
+                            if (value == 'todo') {
+                              _goToTodoPage();
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'todo',
+                              child: Text('todo'),
+                            ),
+                          ],
+                          child: const _CircleIconButton(
+                            icon: Icons.more_horiz,
+                          ),
                         ),
                       ],
                     ),
@@ -240,7 +262,10 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                                       ),
                                     ),
                                     clipBehavior: Clip.antiAlias,
-                                    child: Image.memory(images[index], fit: BoxFit.cover),
+                                    child: Image.memory(
+                                      images[index],
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                   Positioned(
                                     top: 4,
@@ -266,7 +291,8 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                               ),
                             );
                           },
-                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 8),
                           itemCount: images.length,
                         ),
                       ),
@@ -317,10 +343,10 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
 }
 
 class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon, required this.onTap});
+  const _CircleIconButton({required this.icon, this.onTap});
 
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

@@ -17,6 +17,16 @@ class TodoView extends StatefulWidget {
 class _TodoViewState extends State<TodoView> {
   final db = DatabaseHandler();
 
+  Future<void> _openDiaryPage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CalendarDiary()),
+    );
+
+    if (!mounted) return;
+    setState(() {});
+  }
+
   Map<DateTime, List<Memo>> _groupByDate(List<Memo> memos) {
     final Map<DateTime, List<Memo>> grouped = {};
 
@@ -54,17 +64,17 @@ class _TodoViewState extends State<TodoView> {
         ),
         backgroundColor: const Color.fromARGB(16, 203, 255, 243),
         actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CalendarDiary(),
-                ),
-              );
+          PopupMenuButton<String>(
+            tooltip: 'Open menu',
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'diary') {
+                _openDiaryPage();
+              }
             },
-            icon: const Icon(Icons.menu_book_outlined),
-            tooltip: 'Diary',
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(value: 'diary', child: Text('diary')),
+            ],
           ),
         ],
       ),
@@ -292,11 +302,7 @@ class _TodoViewState extends State<TodoView> {
                     final text = textController.text.trim();
                     if (text.isEmpty) return;
 
-                    await db.updateMemo(
-                      memo.memoId!,
-                      text,
-                      selectedCategoryId,
-                    );
+                    await db.updateMemo(memo.memoId!, text, selectedCategoryId);
 
                     Navigator.pop(context);
                     setState(() {});
