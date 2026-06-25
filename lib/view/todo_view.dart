@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:my_todo_list_app/model/memo.dart';
 import 'package:my_todo_list_app/model/todo_category_config.dart';
+import 'package:my_todo_list_app/storage/session_storage.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
 import 'package:my_todo_list_app/util/sub_functions.dart';
-import 'package:my_todo_list_app/view/calendar_diary.dart';
+import 'package:my_todo_list_app/view/account/account_page.dart';
+import 'package:my_todo_list_app/view/diary/calendar_diary.dart';
+import 'package:my_todo_list_app/view/login/login_page.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
 
 class TodoView extends StatefulWidget {
-  const TodoView({super.key});
+  const TodoView({super.key, required this.onMemoTabRequested});
+
+  final VoidCallback onMemoTabRequested;
 
   @override
   State<TodoView> createState() => _TodoViewState();
@@ -30,41 +35,105 @@ class _TodoViewState extends State<TodoView> {
     return grouped;
   }
 
+  DateTime _todayDate() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime _memoDateTime(Memo memo) {
+    final date = DateTime.parse(memo.date);
+    final timeParts = memo.time.split(':');
+    final hour = timeParts.isNotEmpty ? int.tryParse(timeParts[0]) ?? 0 : 0;
+    final minute = timeParts.length > 1 ? int.tryParse(timeParts[1]) ?? 0 : 0;
+
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
   String _dateLabel(DateTime date) {
-    final today = DateTime.now();
-    final base = DateTime(today.year, today.month, today.day);
+    final base = _todayDate();
     final diff = date.difference(base).inDays;
 
-    if (diff == 0) return 'TODAY';
-    if (diff == 1) return 'TOMORROW';
-    if (diff == 2) return 'DAY AFTER TOMORROW';
+    if (diff == 0) return '오늘';
+    if (diff == 1) return 'D - 1';
 
-    return '';
+    return '${date.month}. ${date.day}.';
+  }
+
+  String _dateSubtitle(DateTime date) {
+    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    return '${date.month}. ${date.day}. (${weekdays[date.weekday - 1]}요일)';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0x8BCBFFF3),
+      // backgroundColor: Color(0x8B99CCC2),
+      backgroundColor: Color(0x8BCBFFF3),
       appBar: AppBar(
-        toolbarHeight: 100,
-        title: const Text(
-          'MEMO LIST',
-          style: TextStyle(fontWeight: FontWeight.w500),
+        toolbarHeight: 80,
+        title: Text('Life-LOG', style: TextStyle(fontWeight: FontWeight.w500)),
+        leadingWidth: 74,
+        leading: TextButton(
+          onPressed: _logout,
+          style: TextButton.styleFrom(
+            foregroundColor: Color(0xFF222222),
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(
+            '로그아웃',
+            style: TextStyle(
+              color: Color(0xFF222222),
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
         ),
-        backgroundColor: const Color.fromARGB(16, 203, 255, 243),
+        backgroundColor: Color.fromARGB(16, 203, 255, 243),
         actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CalendarDiary(),
-                ),
-              );
+          TextButton(
+            onPressed: widget.onMemoTabRequested,
+            style: TextButton.styleFrom(
+              foregroundColor: Color(0xFF222222),
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              '+ 메모',
+              style: TextStyle(
+                color: Color(0xFF222222),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+          PopupMenuButton<_HomeAction>(
+            icon: Icon(Icons.more_horiz),
+            tooltip: 'Menu',
+            onSelected: (value) {
+              switch (value) {
+                case _HomeAction.diary:
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CalendarDiary(),
+                    ),
+                  );
+                case _HomeAction.account:
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AccountPage(),
+                    ),
+                  );
+              }
             },
-            icon: const Icon(Icons.menu_book_outlined),
-            tooltip: 'Diary',
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: _HomeAction.diary, child: Text('다이어리로 전환')),
+              PopupMenuItem(value: _HomeAction.account, child: Text('내 계정')),
+            ],
           ),
         ],
       ),
@@ -79,7 +148,7 @@ class _TodoViewState extends State<TodoView> {
                     child: SizedBox(
                       width: 320,
                       child: Text(
-                        'No memos yet.',
+                        '오늘의 생각이나 일정을 가볍게 남겨보세요.',
                         style: TextStyle(
                           fontSize: 16,
                           backgroundColor: Dcolor.stickerGreenV2,
@@ -89,14 +158,41 @@ class _TodoViewState extends State<TodoView> {
                   );
                 }
 
+                final today = _todayDate();
                 final grouped = _groupByDate(snapshot.data!);
-                final dates = grouped.keys.toList()..sort();
+                final dates = grouped.keys.toList()
+                  ..sort((a, b) => a.compareTo(b));
+                final visibleDates = dates.where((date) {
+                  final diff = date.difference(today).inDays;
+                  return diff >= 0 && diff <= 1;
+                }).toList();
+                final futureMemos =
+                    snapshot.data!.where((memo) {
+                      final memoDate = DateTime.parse(memo.date);
+                      final key = DateTime(
+                        memoDate.year,
+                        memoDate.month,
+                        memoDate.day,
+                      );
+                      return key.difference(today).inDays > 1;
+                    }).toList()..sort(
+                      (a, b) => _memoDateTime(a).compareTo(_memoDateTime(b)),
+                    );
 
                 return ListView(
                   padding: const EdgeInsets.all(16),
-                  children: dates
-                      .map((date) => _dateSection(date, grouped[date]!))
-                      .toList(),
+                  children: [
+                    ...visibleDates.map(
+                      (date) => _dateSection(date, grouped[date]!),
+                    ),
+                    if (futureMemos.isNotEmpty)
+                      _dateSection(
+                        null,
+                        futureMemos,
+                        title: '미래',
+                        showDate: false,
+                      ),
+                  ],
                 );
               },
             ),
@@ -106,7 +202,17 @@ class _TodoViewState extends State<TodoView> {
     );
   }
 
-  Widget _dateSection(DateTime date, List<Memo> memos) {
+  Widget _dateSection(
+    DateTime? date,
+    List<Memo> memos, {
+    String? title,
+    bool showDate = true,
+  }) {
+    final sortedMemos = [...memos]
+      ..sort((a, b) => _memoDateTime(a).compareTo(_memoDateTime(b)));
+    final activeMemos = sortedMemos.where((memo) => !memo.isDone).toList();
+    final completedMemos = sortedMemos.where((memo) => memo.isDone).toList();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
@@ -118,25 +224,54 @@ class _TodoViewState extends State<TodoView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _dateLabel(date),
+            title ?? _dateLabel(date!),
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 26,
               fontWeight: FontWeight.w500,
               color: Dcolor.defaultText,
             ),
           ),
-          Text(
-            '${date.month}/${date.day}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Dcolor.textColorGrey,
+          if (showDate && date != null)
+            Text(
+              _dateSubtitle(date),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Dcolor.textColorGrey,
+              ),
             ),
-          ),
           const SizedBox(height: 12),
-          ...memos.map(_memoRow),
+          ...activeMemos.map(_memoRow),
+          if (completedMemos.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            _completedSectionHeader(),
+            const SizedBox(height: 12),
+            ...completedMemos.map(_memoRow),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _completedSectionHeader() {
+    return Row(
+      children: [
+        Expanded(
+          child: Divider(
+            color: Dcolor.textColorGrey.withValues(alpha: 0.35),
+            thickness: 1,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          '완료',
+          style: TextStyle(
+            color: Dcolor.defaultText,
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -200,22 +335,7 @@ class _TodoViewState extends State<TodoView> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            m.isDone
-                                ? Icons.check_circle_rounded
-                                : Icons.circle_outlined,
-                            color: todoCategoryAccentColor(m.categoryId),
-                            size: 33,
-                          ),
-                          onPressed: () async {
-                            final next = !m.isDone;
-                            await db.updateMemoDone(m.memoId!, next);
-                            setState(() {
-                              m.isDone = next;
-                            });
-                          },
-                        ),
+                        _memoDoneAction(m),
                       ],
                     ),
                   ),
@@ -225,6 +345,36 @@ class _TodoViewState extends State<TodoView> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _memoDoneAction(Memo memo) {
+    final accentColor = todoCategoryAccentColor(memo.categoryId);
+
+    return TextButton(
+      onPressed: () async {
+        final next = !memo.isDone;
+        await db.updateMemoDone(memo.memoId!, next);
+        setState(() {
+          memo.isDone = next;
+        });
+      },
+      style: TextButton.styleFrom(
+        foregroundColor: accentColor,
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(44, 44),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: memo.isDone
+          ? Text(
+              '완료',
+              style: TextStyle(
+                color: accentColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          : Icon(Icons.circle_outlined, color: accentColor, size: 33),
     );
   }
 
@@ -264,17 +414,12 @@ class _TodoViewState extends State<TodoView> {
                     decoration: const InputDecoration(hintText: 'Enter memo'),
                   ),
                   ...todoCategoryConfigs.map(
-                    (category) => RadioListTile<int>(
-                      value: category.id,
-                      groupValue: selectedCategoryId,
-                      title: Text(
-                        category.name,
-                        style: TextStyle(color: category.accentColor),
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setModalState(() => selectedCategoryId = value);
+                    (category) => _categoryOption(
+                      name: category.name,
+                      accentColor: category.accentColor,
+                      isSelected: selectedCategoryId == category.id,
+                      onTap: () {
+                        setModalState(() => selectedCategoryId = category.id);
                       },
                     ),
                   ),
@@ -291,14 +436,11 @@ class _TodoViewState extends State<TodoView> {
                   onPressed: () async {
                     final text = textController.text.trim();
                     if (text.isEmpty) return;
+                    final navigator = Navigator.of(context);
 
-                    await db.updateMemo(
-                      memo.memoId!,
-                      text,
-                      selectedCategoryId,
-                    );
+                    await db.updateMemo(memo.memoId!, text, selectedCategoryId);
 
-                    Navigator.pop(context);
+                    navigator.pop();
                     setState(() {});
                   },
                   child: const Text('Save'),
@@ -310,4 +452,42 @@ class _TodoViewState extends State<TodoView> {
       },
     );
   }
+
+  Future<void> _logout() async {
+    await SessionStorage.logout();
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
+  Widget _categoryOption({
+    required String name,
+    required Color accentColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: 32,
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: accentColor,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(name, style: TextStyle(color: accentColor)),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+enum _HomeAction { diary, account }

@@ -35,9 +35,9 @@ final List<TodoCategoryConfig> todoCategoryConfigs = [
   TodoCategoryConfig(
     id: 3,
     name: '기타',
-    colorName: 'pink',
-    accentColor: Dcolor.stickerPink,
-    backgroundColor: Dcolor.stickerPinkV2,
+    colorName: 'purple',
+    accentColor: Dcolor.stickerPP,
+    backgroundColor: Dcolor.stickerPPV2,
   ),
 ];
 

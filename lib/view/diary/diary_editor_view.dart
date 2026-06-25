@@ -115,7 +115,12 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
         image: coverImage,
       );
     } else {
-      await db.updateDiary(diary!.diaryId!, content, images);
+      await db.updateDiary(
+        diary!.diaryId!,
+        content,
+        images,
+        diaryDate: _dateKey(widget.date),
+      );
     }
 
     if (!mounted) return;
@@ -204,7 +209,7 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                'Add photos if you want',
+                                '사진을 등록하세요.',
                                 style: TextStyle(color: Dcolor.textColorGrey),
                               ),
                             ],
@@ -240,7 +245,10 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                                       ),
                                     ),
                                     clipBehavior: Clip.antiAlias,
-                                    child: Image.memory(images[index], fit: BoxFit.cover),
+                                    child: Image.memory(
+                                      images[index],
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                   Positioned(
                                     top: 4,
@@ -266,7 +274,8 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                               ),
                             );
                           },
-                          separatorBuilder: (context, index) => const SizedBox(width: 8),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 8),
                           itemCount: images.length,
                         ),
                       ),
@@ -280,7 +289,7 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                         minLines: null,
                         textAlignVertical: TextAlignVertical.top,
                         decoration: const InputDecoration(
-                          hintText: 'Write your day here.',
+                          hintText: '소중한 당신의 일상을 펼쳐보세요.',
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.zero,
                         ),

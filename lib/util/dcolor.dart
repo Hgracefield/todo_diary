@@ -13,6 +13,8 @@ class Dcolor {
   static Color stickerOrangeV2 = hexToColor("E67E22", 0.2);
   static Color stickerPink = hexToColor("FFB6B9", 1);
   static Color stickerPinkV2 = hexToColor("FFB6B9", 0.2);
+  static Color stickerPP = hexToColor("8174A0", 1);
+  static Color stickerPPV2 = hexToColor("8174A0", 0.2);
   static Color stickerRemove = hexToColor("FF383C", 0.5);
   static Color stickerRemoveV2 = hexToColor("FF937E", 0.4);
 
