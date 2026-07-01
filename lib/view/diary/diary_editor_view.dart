@@ -127,6 +127,72 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
     Navigator.pop(context, true);
   }
 
+  Future<void> _deleteDiary() async {
+    if (diary == null || isSaving) return;
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 26, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+          content: Text(
+            '일기를 삭제하시겠습니까?',
+            style: TextStyle(
+              color: Dcolor.defaultText,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFF333333),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: TextButton.styleFrom(
+                      backgroundColor: Dcolor.stickerPP,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('삭제'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) return;
+
+    setState(() {
+      isSaving = true;
+    });
+
+    await db.deleteDiaryByDate(_dateKey(widget.date));
+
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  }
+
   void _removeImage(int index) {
     setState(() {
       images.removeAt(index);
@@ -239,7 +305,7 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
                                         color: isSelected
-                                            ? const Color(0xFF2D9CFF)
+                                            ? const Color(0xFFE67E22)
                                             : Colors.transparent,
                                         width: 2,
                                       ),
@@ -301,21 +367,46 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isSaving ? null : _saveDiary,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: Dcolor.defaultText,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+                    Row(
+                      children: [
+                        if (diary != null) ...[
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: ElevatedButton(
+                                onPressed: isSaving ? null : _deleteDiary,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFE85D5D),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                ),
+                                child: const Text('삭제'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: isSaving ? null : _saveDiary,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Dcolor.defaultText,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                              child: Text(isSaving ? '저장 중...' : '확인'),
+                            ),
                           ),
                         ),
-                        child: Text(isSaving ? 'Saving...' : 'Save'),
-                      ),
+                      ],
                     ),
                   ],
                 ),

@@ -6,6 +6,7 @@ class Schedule {
   final String? scheduleContent;
   final String scheduleStartDate;
   final String scheduleEndDate;
+  final bool scheduleIsDone;
   final String? scheduleCreatedAt;
   final String? scheduleUpdatedAt;
 
@@ -17,6 +18,7 @@ class Schedule {
     this.scheduleContent,
     required this.scheduleStartDate,
     required this.scheduleEndDate,
+    this.scheduleIsDone = false,
     this.scheduleCreatedAt,
     this.scheduleUpdatedAt,
   });
@@ -32,6 +34,11 @@ class Schedule {
           json['scheduleStartDate'] ?? json['SCHEDULE_START_DATE'] ?? '',
       scheduleEndDate:
           json['scheduleEndDate'] ?? json['SCHEDULE_END_DATE'] ?? '',
+      scheduleIsDone:
+          json['scheduleIsDone'] == true ||
+          json['SCHEDULE_IS_DONE'] == true ||
+          json['scheduleIsDone'] == 1 ||
+          json['SCHEDULE_IS_DONE'] == 1,
       scheduleCreatedAt:
           json['scheduleCreatedAt'] ?? json['SCHEDULE_CREATED_AT'],
       scheduleUpdatedAt:
@@ -48,6 +55,7 @@ class Schedule {
       'scheduleContent': scheduleContent,
       'scheduleStartDate': scheduleStartDate,
       'scheduleEndDate': scheduleEndDate,
+      'scheduleIsDone': scheduleIsDone,
     };
   }
 }

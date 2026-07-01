@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import date
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -29,8 +32,8 @@ def create_schedule_type(
 @router.get("/schedules", response_model=list[schemas.ScheduleRead])
 def get_schedules(
     user_id: int = Query(alias="userId"),
-    start_date: date | None = Query(default=None, alias="startDate"),
-    end_date: date | None = Query(default=None, alias="endDate"),
+    start_date: Optional[date] = Query(default=None, alias="startDate"),
+    end_date: Optional[date] = Query(default=None, alias="endDate"),
     db: Session = Depends(get_db),
 ):
     return crud.list_schedules(db, user_id, start_date, end_date)

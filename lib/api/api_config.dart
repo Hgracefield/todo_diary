@@ -8,8 +8,8 @@ class ApiConfig {
   static final String baseUrl = _configuredBaseUrl.isNotEmpty
       ? _configuredBaseUrl
       : defaultTargetPlatform == TargetPlatform.android
-      ? 'http://10.0.2.2:8080/api'
-      : 'http://127.0.0.1:8080/api';
+      ? 'http://10.0.2.2:8000/api'
+      : 'http://127.0.0.1:8000/api';
 
   static Uri uri(String path, [Map<String, dynamic>? queryParameters]) {
     final normalizedBaseUrl = baseUrl.endsWith('/')

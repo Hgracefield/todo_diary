@@ -4,6 +4,7 @@ class SessionStorage {
   static const _isLoggedInKey = 'is_logged_in';
   static const _userIdKey = 'account_user_id';
   static const _emailKey = 'account_email';
+  static const _emailHistoryKey = 'account_email_history';
   static const _passwordKey = 'account_password';
   static const _nameKey = 'account_name';
   static const _birthDateKey = 'account_birth_date';
@@ -12,7 +13,8 @@ class SessionStorage {
 
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_isLoggedInKey) ?? false;
+    return (prefs.getBool(_isLoggedInKey) ?? false) &&
+        prefs.getInt(_userIdKey) != null;
   }
 
   static Future<void> login({
@@ -29,6 +31,7 @@ class SessionStorage {
     await prefs.setInt(_userIdKey, userId);
     if (email.isNotEmpty) {
       await prefs.setString(_emailKey, email);
+      await _rememberEmail(prefs, email);
     }
     if (password.isNotEmpty) {
       await prefs.setString(_passwordKey, password);
@@ -51,6 +54,15 @@ class SessionStorage {
     await prefs.remove(_birthDateKey);
     await prefs.remove(_phoneKey);
     await prefs.remove(_addressKey);
+  }
+
+  static Future<List<String>> emailHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final emails = prefs.getStringList(_emailHistoryKey) ?? <String>[];
+    final currentEmail = prefs.getString(_emailKey);
+    if (currentEmail == null || currentEmail.isEmpty) return emails;
+    if (emails.contains(currentEmail)) return emails;
+    return [currentEmail, ...emails];
   }
 
   static Future<int?> userId() async {
@@ -77,6 +89,9 @@ class SessionStorage {
       await prefs.setInt(_userIdKey, profile.userId!);
     }
     await prefs.setString(_emailKey, profile.email);
+    if (profile.email.isNotEmpty) {
+      await _rememberEmail(prefs, profile.email);
+    }
     await prefs.setString(_passwordKey, profile.password);
     await prefs.setString(_nameKey, profile.name);
     await prefs.setString(_birthDateKey, profile.birthDate);
@@ -86,6 +101,21 @@ class SessionStorage {
     } else {
       await prefs.setString(_addressKey, profile.address!);
     }
+  }
+
+  static Future<void> _rememberEmail(
+    SharedPreferences prefs,
+    String email,
+  ) async {
+    final normalizedEmail = email.trim();
+    if (normalizedEmail.isEmpty) return;
+
+    final emails = prefs.getStringList(_emailHistoryKey) ?? <String>[];
+    final nextEmails = [
+      normalizedEmail,
+      ...emails.where((item) => item != normalizedEmail),
+    ];
+    await prefs.setStringList(_emailHistoryKey, nextEmails.take(5).toList());
   }
 }
 

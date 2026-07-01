@@ -3,6 +3,7 @@ import 'package:my_todo_list_app/api/rest_api_service.dart';
 import 'package:my_todo_list_app/model/server/user.dart';
 import 'package:my_todo_list_app/storage/session_storage.dart';
 import 'package:my_todo_list_app/view/login/korea_city_options.dart';
+import 'package:my_todo_list_app/view/login/login_page.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_button.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_text_field.dart';
 
@@ -27,12 +28,15 @@ class _AccountPageState extends State<AccountPage> {
   String? phoneStatusText;
   bool? isPhoneAvailable;
   String? checkedPhone;
+  String savedPassword = '';
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     phoneController.addListener(_refreshPhoneState);
+    passwordController.addListener(_refreshPasswordState);
+    newPasswordController.addListener(_refreshPasswordState);
     passwordConfirmController.addListener(_refreshPasswordState);
     _loadProfile();
   }
@@ -40,6 +44,8 @@ class _AccountPageState extends State<AccountPage> {
   @override
   void dispose() {
     phoneController.removeListener(_refreshPhoneState);
+    passwordController.removeListener(_refreshPasswordState);
+    newPasswordController.removeListener(_refreshPasswordState);
     passwordConfirmController.removeListener(_refreshPasswordState);
     emailController.dispose();
     passwordController.dispose();
@@ -71,11 +77,11 @@ class _AccountPageState extends State<AccountPage> {
     if (!mounted) return;
     setState(() {
       emailController.text = profile.email;
-      passwordController.text = profile.password;
       nameController.text = profile.name;
       birthDateController.text = profile.birthDate;
       phoneController.text = profile.phone;
       selectedAddress = profile.address;
+      savedPassword = profile.password;
       isLoading = false;
     });
   }
@@ -92,23 +98,33 @@ class _AccountPageState extends State<AccountPage> {
 
   void _refreshPasswordState() {
     if (!mounted) return;
-    setState(() {
-      if (!_isPasswordConfirmed) {
-        newPasswordController.clear();
-      }
-    });
+    if (!_isCurrentPasswordValid &&
+        (newPasswordController.text.isNotEmpty ||
+            passwordConfirmController.text.isNotEmpty)) {
+      newPasswordController.clear();
+      passwordConfirmController.clear();
+    }
+    setState(() {});
+  }
+
+  bool get _isCurrentPasswordValid {
+    return passwordController.text.isNotEmpty &&
+        passwordController.text == savedPassword;
   }
 
   bool get _isPasswordConfirmed {
+    final password = newPasswordController.text;
     final confirm = passwordConfirmController.text;
-    return confirm.isNotEmpty && confirm == passwordController.text;
+    return password.isNotEmpty && confirm.isNotEmpty && password == confirm;
   }
 
   String? get _passwordStatusText {
+    final password = newPasswordController.text;
     final confirm = passwordConfirmController.text;
+    if (password.isEmpty && confirm.isEmpty) return null;
     if (confirm.isEmpty) return null;
-    if (_isPasswordConfirmed) return '비밀번호가 동일합니다.';
-    return '비밀번호가 틀립니다.';
+    if (_isPasswordConfirmed) return '새 비밀번호가 동일합니다.';
+    return '새 비밀번호가 다릅니다.';
   }
 
   Color get _passwordStatusColor {
@@ -164,18 +180,29 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _saveProfile() async {
-    if (passwordConfirmController.text.isNotEmpty && !_isPasswordConfirmed) {
+    final oldProfile = await SessionStorage.loadProfile();
+    final currentPassword = passwordController.text;
+    final newPassword = newPasswordController.text;
+    final passwordConfirm = passwordConfirmController.text;
+    final wantsPasswordChange =
+        currentPassword.isNotEmpty ||
+        newPassword.isNotEmpty ||
+        passwordConfirm.isNotEmpty;
+
+    if (wantsPasswordChange && !_isCurrentPasswordValid) {
+      _showMessage('원래 비밀번호가 일치하지 않습니다.');
       return;
     }
 
-    final oldProfile = await SessionStorage.loadProfile();
-    final newPassword = newPasswordController.text;
+    if (wantsPasswordChange && !_isPasswordConfirmed) {
+      _showMessage('새 비밀번호와 새 비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
     final profile = AccountProfile(
       userId: oldProfile.userId,
       email: emailController.text.trim(),
-      password: _isPasswordConfirmed && newPassword.isNotEmpty
-          ? newPassword
-          : passwordController.text,
+      password: wantsPasswordChange ? newPassword : oldProfile.password,
       name: nameController.text.trim(),
       birthDate: birthDateController.text.trim(),
       phone: phoneController.text.trim(),
@@ -192,27 +219,50 @@ class _AccountPageState extends State<AccountPage> {
             userName: profile.name,
             userBirthDate: birthDate.isEmpty ? null : birthDate,
             userEmail: profile.email,
-            userPassword: profile.password,
+            userPassword: wantsPasswordChange ? profile.password : null,
             userPhone: profile.phone,
             userAddress: profile.address,
           ),
         );
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('서버에 계정 정보를 저장하지 못했습니다.')));
+        _showMessage('서버에 계정 정보를 저장하지 못했습니다.');
         return;
       }
     }
     await SessionStorage.saveProfile(profile);
     if (!mounted) return;
-    passwordController.text = profile.password;
+    savedPassword = profile.password;
+    passwordController.clear();
     passwordConfirmController.clear();
     newPasswordController.clear();
+    _showMessage('계정 정보가 저장되었습니다.');
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('계정 정보가 저장되었습니다.')));
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _logout() async {
+    await SessionStorage.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
+    );
+  }
+
+  void _goBack() {
+    Navigator.pop(context);
+  }
+
+  void _openScheduleReport() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('일정 리포트는 준비 중입니다.')));
   }
 
   @override
@@ -241,28 +291,27 @@ class _AccountPageState extends State<AccountPage> {
                       textColor: Color(0xFF999999),
                     ),
                     _AccountField(
-                      label: '비밀번호',
-                      hintText: '비밀번호',
+                      label: '비밀번호 (변경을 원하면 원래 비밀번호를 입력해주세요)',
+                      hintText: '원래 비밀번호를 입력',
                       controller: passwordController,
                       obscureText: true,
-                      readOnly: true,
-                      textColor: const Color(0xFF999999),
                     ),
                     _AccountField(
-                      label: '비밀번호 확인',
-                      hintText: '현재 비밀번호를 입력',
+                      label: '새 비밀번호',
+                      hintText: '새 비밀번호를 입력',
+                      controller: newPasswordController,
+                      obscureText: true,
+                      enabled: _isCurrentPasswordValid,
+                    ),
+                    _AccountField(
+                      label: '새 비밀번호 확인',
+                      hintText: '새 비밀번호를 다시 입력',
                       controller: passwordConfirmController,
                       obscureText: true,
+                      enabled: _isCurrentPasswordValid,
                       statusText: _passwordStatusText,
                       statusColor: _passwordStatusColor,
                     ),
-                    if (_isPasswordConfirmed)
-                      _AccountField(
-                        label: '비밀번호 변경',
-                        hintText: '새 비밀번호를 입력',
-                        controller: newPasswordController,
-                        obscureText: true,
-                      ),
                     const SizedBox(height: 18),
                     _AccountField(
                       label: '이름',
@@ -299,10 +348,42 @@ class _AccountPageState extends State<AccountPage> {
                       },
                     ),
                     const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LoginButton(
+                            label: '뒤로가기',
+                            onPressed: _goBack,
+                            backgroundColor: const Color(0xFFA3D1C6),
+                            height: 52,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: LoginButton(
+                            label: '저장',
+                            onPressed: _saveProfile,
+                            backgroundColor: const Color(0xFFE67E22),
+                            height: 52,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     LoginButton(
-                      label: '저장',
-                      onPressed: _saveProfile,
-                      backgroundColor: const Color(0xFFE67E22),
+                      label: '일정 리포트',
+                      onPressed: _openScheduleReport,
+                      backgroundColor: const Color(0xFF2D9CFF),
+                      height: 52,
+                      fontSize: 16,
+                    ),
+                    const SizedBox(height: 12),
+                    LoginButton(
+                      label: '로그아웃',
+                      onPressed: _logout,
+                      backgroundColor: const Color(0xFF222222),
                       height: 52,
                       fontSize: 16,
                     ),
@@ -325,6 +406,7 @@ class _AccountField extends StatelessWidget {
     this.statusText,
     this.statusColor,
     this.readOnly = false,
+    this.enabled = true,
     this.onTap,
     this.textColor,
   });
@@ -338,6 +420,7 @@ class _AccountField extends StatelessWidget {
   final String? statusText;
   final Color? statusColor;
   final bool readOnly;
+  final bool enabled;
   final VoidCallback? onTap;
   final Color? textColor;
 
@@ -367,6 +450,7 @@ class _AccountField extends StatelessWidget {
                   keyboardType: keyboardType,
                   obscureText: obscureText,
                   readOnly: readOnly,
+                  enabled: enabled,
                   onTap: onTap,
                   textColor: textColor,
                   height: 45,
@@ -402,6 +486,10 @@ class _AccountCityPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedValue = value != null && koreaCityOptions.contains(value)
+        ? value
+        : null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -420,7 +508,7 @@ class _AccountCityPicker extends StatelessWidget {
           SizedBox(
             height: 45,
             child: DropdownButtonFormField<String>(
-              initialValue: value,
+              initialValue: selectedValue,
               isExpanded: true,
               menuMaxHeight: 320,
               icon: const Icon(

@@ -9,7 +9,6 @@ class Memo {
   String? scheduleCreatedAt;
   String? scheduleUpdatedAt;
 
-  // SCHEDULE에는 완료 여부 컬럼이 없어서 기존 UI 호환용으로만 유지합니다.
   bool isDone;
 
   Memo({
@@ -68,7 +67,13 @@ class Memo {
       scheduleEndDate: normalizeDateTime(endSource),
       scheduleCreatedAt: res['scheduleCreatedAt'] ?? res['SCHEDULE_CREATED_AT'],
       scheduleUpdatedAt: res['scheduleUpdatedAt'] ?? res['SCHEDULE_UPDATED_AT'],
-      isDone: res['isDone'] == 1 || res['isDone'] == true,
+      isDone:
+          res['isDone'] == 1 ||
+          res['isDone'] == true ||
+          res['scheduleIsDone'] == 1 ||
+          res['scheduleIsDone'] == true ||
+          res['SCHEDULE_IS_DONE'] == 1 ||
+          res['SCHEDULE_IS_DONE'] == true,
     );
   }
 
@@ -83,6 +88,7 @@ class Memo {
       'scheduleContent': scheduleContent,
       'scheduleStartDate': scheduleStartDate,
       'scheduleEndDate': scheduleEndDate,
+      'scheduleIsDone': isDone,
     };
   }
 

@@ -321,6 +321,10 @@ class _KoreaCityPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selectedValue = value != null && koreaCityOptions.contains(value)
+        ? value
+        : null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Column(
@@ -339,7 +343,7 @@ class _KoreaCityPicker extends StatelessWidget {
           SizedBox(
             height: 45,
             child: DropdownButtonFormField<String>(
-              initialValue: value,
+              initialValue: selectedValue,
               isExpanded: true,
               menuMaxHeight: 320,
               icon: const Icon(

@@ -1,12 +1,46 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from database import engine
 from routers import diaries, images, schedules, users
 
+
+def migrate_schedule_done_column():
+    with engine.begin() as connection:
+        db_name = connection.exec_driver_sql("SELECT DATABASE()").scalar()
+        exists = connection.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = :db_name
+                  AND TABLE_NAME = 'SCHEDULE'
+                  AND COLUMN_NAME = 'SCHEDULE_IS_DONE'
+                """
+            ),
+            {"db_name": db_name},
+        ).scalar()
+
+        if not exists:
+            connection.exec_driver_sql(
+                "ALTER TABLE SCHEDULE "
+                "ADD COLUMN SCHEDULE_IS_DONE BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    migrate_schedule_done_column()
+    yield
+
+
 app = FastAPI(
     title="Life Log API",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

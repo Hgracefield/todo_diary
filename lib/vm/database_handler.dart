@@ -225,6 +225,36 @@ class DatabaseHandler {
     return deleted;
   }
 
+  Future<int> deleteDiaryByDate(String date) async {
+    final db = await database;
+    final rows = await db.query(
+      'diary',
+      columns: ['diaryId'],
+      where: 'diaryDate = ?',
+      whereArgs: [date],
+    );
+    final localIds = rows.map((row) => row['diaryId'] as int).toList();
+
+    final deleted = await db.transaction((txn) async {
+      for (final id in localIds) {
+        await txn.delete('diary_image', where: 'diaryId = ?', whereArgs: [id]);
+      }
+      return txn.delete('diary', where: 'diaryDate = ?', whereArgs: [date]);
+    });
+
+    final userId = await SessionStorage.userId();
+    if (userId != null) {
+      try {
+        final remote = await _api.getDiaryByDate(userId: userId, date: date);
+        if (remote?.diaryId != null) {
+          await _api.deleteDiary(remote!.diaryId!);
+        }
+      } catch (_) {}
+    }
+
+    return deleted;
+  }
+
   Future<Diary?> getDiaryByDate(String date) async {
     final db = await database;
     final result = await db.query(
@@ -356,8 +386,18 @@ class DatabaseHandler {
             scheduleContent: content,
             scheduleStartDate: '${date}T$time:00',
             scheduleEndDate: '${date}T$time:00',
+            scheduleIsDone: false,
           ),
         );
+        if (item.scheduleId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('schedule_done_${item.scheduleId}');
+          if (item.scheduleIsDone) {
+            await _api.updateScheduleFields(item.scheduleId!, {
+              'scheduleIsDone': false,
+            });
+          }
+        }
         return item.scheduleId!;
       } catch (_) {}
     }
@@ -372,34 +412,54 @@ class DatabaseHandler {
     });
   }
 
-  Future<int> updateMemo(int id, String content, int categoryId) async {
+  Future<int> updateMemo(
+    int id,
+    String content,
+    int categoryId, {
+    String? date,
+    String? time,
+  }) async {
     final userId = await SessionStorage.userId();
     if (userId != null) {
       try {
-        await _api.updateScheduleFields(id, {
+        final fields = {
           'scheduleTitle': content,
           'scheduleContent': content,
           'scheduleTypeId': categoryId,
-        });
+        };
+
+        if (date != null && time != null) {
+          fields['scheduleStartDate'] = '${date}T$time:00';
+          fields['scheduleEndDate'] = '${date}T$time:00';
+        }
+
+        await _api.updateScheduleFields(id, fields);
         return 1;
       } catch (_) {}
     }
 
     final db = await database;
-    return db.update(
-      'memo',
-      {'content': content, 'categoryId': categoryId},
-      where: 'memoId = ?',
-      whereArgs: [id],
-    );
+    final values = {'content': content, 'categoryId': categoryId};
+
+    if (date != null) {
+      values['date'] = date;
+    }
+    if (time != null) {
+      values['time'] = time;
+    }
+
+    return db.update('memo', values, where: 'memoId = ?', whereArgs: [id]);
   }
 
   Future<int> updateMemoDone(int memoId, bool isDone) async {
     final userId = await SessionStorage.userId();
     if (userId != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('schedule_done_$memoId', isDone);
-      return 1;
+      try {
+        await _api.updateScheduleFields(memoId, {'scheduleIsDone': isDone});
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('schedule_done_$memoId');
+        return 1;
+      } catch (_) {}
     }
 
     final db = await database;
@@ -460,25 +520,26 @@ class DatabaseHandler {
   }
 
   Future<List<Memo>> _schedulesToMemos(List<Schedule> schedules) async {
-    final prefs = await SharedPreferences.getInstance();
-    return schedules
-        .map(
-          (item) => Memo(
-            scheduleId: item.scheduleId,
-            userId: item.userId,
-            scheduleTypeId: item.scheduleTypeId,
-            scheduleTitle: item.scheduleTitle,
-            scheduleContent: item.scheduleContent,
-            scheduleStartDate: item.scheduleStartDate,
-            scheduleEndDate: item.scheduleEndDate,
-            scheduleCreatedAt: item.scheduleCreatedAt,
-            scheduleUpdatedAt: item.scheduleUpdatedAt,
-            isDone: item.scheduleId == null
-                ? false
-                : prefs.getBool('schedule_done_${item.scheduleId}') ?? false,
-          ),
-        )
-        .toList();
+    final memos = <Memo>[];
+
+    for (final item in schedules) {
+      memos.add(
+        Memo(
+          scheduleId: item.scheduleId,
+          userId: item.userId,
+          scheduleTypeId: item.scheduleTypeId,
+          scheduleTitle: item.scheduleTitle,
+          scheduleContent: item.scheduleContent,
+          scheduleStartDate: item.scheduleStartDate,
+          scheduleEndDate: item.scheduleEndDate,
+          scheduleCreatedAt: item.scheduleCreatedAt,
+          scheduleUpdatedAt: item.scheduleUpdatedAt,
+          isDone: item.scheduleIsDone,
+        ),
+      );
+    }
+
+    return memos;
   }
 
   Future<void> _createOrUpdateServerDiary(Diary diary) async {

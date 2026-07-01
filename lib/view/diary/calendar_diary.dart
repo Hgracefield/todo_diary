@@ -3,7 +3,6 @@ import 'package:my_todo_list_app/model/diary.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
 import 'package:my_todo_list_app/view/account/account_page.dart';
 import 'package:my_todo_list_app/view/diary/diary_editor_view.dart';
-import 'package:my_todo_list_app/view/home.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
 import 'package:table_calendar/table_calendar.dart';
 
@@ -15,6 +14,8 @@ class CalendarDiary extends StatefulWidget {
 }
 
 class _CalendarDiaryState extends State<CalendarDiary> {
+  static const _pageStartColor = Color(0x33E67E22);
+
   final db = DatabaseHandler();
 
   DateTime focusedDay = DateTime.now();
@@ -61,15 +62,63 @@ class _CalendarDiaryState extends State<CalendarDiary> {
     }
   }
 
-  Diary? _diaryForDate(DateTime date) {
-    return diaryMap[_dateKey(date)];
+  Future<bool> _confirmOpenDiaryEditor() async {
+    final shouldOpen = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(24, 26, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+          content: Text(
+            '오늘의 내 역사를 작성하시겠습니까?',
+            style: TextStyle(
+              color: Dcolor.defaultText,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFF333333),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFFE67E22),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('작성하기'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldOpen == true;
   }
 
-  void _openMemoTab() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const Home(initialTabIndex: 1)),
-    );
+  Diary? _diaryForDate(DateTime date) {
+    return diaryMap[_dateKey(date)];
   }
 
   void _openAccountPage() {
@@ -82,204 +131,213 @@ class _CalendarDiaryState extends State<CalendarDiary> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFDDE4EA),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
-          child: Column(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Month ${focusedDay.month}',
-                          style: TextStyle(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            color: Dcolor.defaultText,
-                            letterSpacing: -1.5,
-                          ),
-                        ),
-                        const Spacer(),
-                        PopupMenuButton<_DiaryAction>(
-                          icon: Icon(
-                            Icons.more_horiz,
-                            color: Dcolor.textColorGrey,
-                            size: 28,
-                          ),
-                          tooltip: 'Menu',
-                          onSelected: (value) {
-                            switch (value) {
-                              case _DiaryAction.memo:
-                                _openMemoTab();
-                              case _DiaryAction.account:
-                                _openAccountPage();
-                            }
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(
-                              value: _DiaryAction.memo,
-                              child: Text('메모 화면으로 전환'),
+      backgroundColor: Colors.white,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_pageStartColor, Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Month ${focusedDay.month}',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: Dcolor.defaultText,
+                              letterSpacing: 0,
                             ),
-                            PopupMenuItem(
-                              value: _DiaryAction.account,
-                              child: Text('내 계정'),
+                          ),
+                          const Spacer(),
+                          const _PageBadge(
+                            label: 'Diary',
+                            backgroundColor: Color(0xFFE67E22),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(
+                              Icons.person_outline,
+                              color: Dcolor.textColorGrey,
+                              size: 28,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF7F7F7),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : TableCalendar(
-                                firstDay: DateTime.utc(2022, 1, 1),
-                                lastDay: DateTime.utc(2100, 12, 31),
-                                focusedDay: focusedDay,
-                                currentDay: DateTime.now(),
-                                headerVisible: false,
-                                availableGestures:
-                                    AvailableGestures.horizontalSwipe,
-                                rowHeight: 92,
-                                sixWeekMonthsEnforced: true,
-                                selectedDayPredicate: (day) =>
-                                    isSameDay(selectedDay, day),
-                                onDaySelected: (selected, focused) async {
-                                  setState(() {
-                                    selectedDay = selected;
-                                    focusedDay = focused;
-                                  });
-                                  await _openDiaryEditor(selected);
-                                },
-                                onPageChanged: (focused) {
-                                  setState(() {
-                                    focusedDay = focused;
-                                  });
-                                },
-                                calendarStyle: CalendarStyle(
-                                  outsideDaysVisible: true,
-                                  defaultTextStyle: TextStyle(
-                                    color: Dcolor.defaultText,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  weekendTextStyle: const TextStyle(
-                                    color: Color(0xFF4D94FF),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  outsideTextStyle: const TextStyle(
-                                    color: Color(0xFFD1D5DB),
-                                    fontSize: 13,
-                                  ),
-                                  selectedDecoration: const BoxDecoration(
-                                    color: Color(0xFF2D9CFF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  todayDecoration: const BoxDecoration(
-                                    color: Color(0xFF2D9CFF),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  cellMargin: const EdgeInsets.symmetric(
-                                    horizontal: 2,
-                                    vertical: 10,
-                                  ),
-                                  tablePadding: EdgeInsets.zero,
-                                ),
-                                daysOfWeekHeight: 28,
-                                daysOfWeekStyle: DaysOfWeekStyle(
-                                  weekdayStyle: TextStyle(
-                                    color: Dcolor.textColorGrey,
-                                    fontSize: 11,
-                                  ),
-                                  weekendStyle: const TextStyle(
-                                    color: Color(0xFFB6BCC4),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                calendarBuilders: CalendarBuilders(
-                                  dowBuilder: (context, day) {
-                                    const labels = [
-                                      'Sun',
-                                      'Mon',
-                                      'Tue',
-                                      'Wed',
-                                      'Thu',
-                                      'Fri',
-                                      'Sat',
-                                    ];
-                                    final label = labels[day.weekday % 7];
-                                    final isWeekend =
-                                        day.weekday == DateTime.sunday ||
-                                        day.weekday == DateTime.saturday;
-
-                                    return Center(
-                                      child: Text(
-                                        label,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isWeekend
-                                              ? const Color(0xFFB6BCC4)
-                                              : Dcolor.textColorGrey,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  defaultBuilder: (context, day, focused) {
-                                    return _CalendarCell(
-                                      day: day,
-                                      diary: _diaryForDate(day),
-                                      isSelected: false,
-                                      isToday: isSameDay(day, DateTime.now()),
-                                      isOutside: day.month != focusedDay.month,
-                                    );
-                                  },
-                                  selectedBuilder: (context, day, focused) {
-                                    return _CalendarCell(
-                                      day: day,
-                                      diary: _diaryForDate(day),
-                                      isSelected: true,
-                                      isToday: false,
-                                      isOutside: day.month != focusedDay.month,
-                                    );
-                                  },
-                                  todayBuilder: (context, day, focused) {
-                                    return _CalendarCell(
-                                      day: day,
-                                      diary: _diaryForDate(day),
-                                      isSelected: true,
-                                      isToday: true,
-                                      isOutside: day.month != focusedDay.month,
-                                    );
-                                  },
-                                  outsideBuilder: (context, day, focused) {
-                                    return _CalendarCell(
-                                      day: day,
-                                      diary: _diaryForDate(day),
-                                      isSelected: false,
-                                      isToday: false,
-                                      isOutside: true,
-                                    );
-                                  },
-                                ),
-                              ),
+                            tooltip: '내 계정',
+                            onPressed: _openAccountPage,
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7F7F7),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : TableCalendar(
+                                  firstDay: DateTime.utc(2022, 1, 1),
+                                  lastDay: DateTime.utc(2100, 12, 31),
+                                  focusedDay: focusedDay,
+                                  currentDay: DateTime.now(),
+                                  headerVisible: false,
+                                  availableGestures:
+                                      AvailableGestures.horizontalSwipe,
+                                  rowHeight: 92,
+                                  sixWeekMonthsEnforced: true,
+                                  selectedDayPredicate: (day) =>
+                                      isSameDay(selectedDay, day),
+                                  onDaySelected: (selected, focused) async {
+                                    final hasDiary =
+                                        _diaryForDate(selected) != null;
+                                    if (!hasDiary) {
+                                      final shouldOpen =
+                                          await _confirmOpenDiaryEditor();
+                                      if (!shouldOpen) return;
+                                    }
+
+                                    setState(() {
+                                      selectedDay = selected;
+                                      focusedDay = focused;
+                                    });
+                                    await _openDiaryEditor(selected);
+                                  },
+                                  onPageChanged: (focused) {
+                                    setState(() {
+                                      focusedDay = focused;
+                                    });
+                                  },
+                                  calendarStyle: CalendarStyle(
+                                    outsideDaysVisible: true,
+                                    defaultTextStyle: TextStyle(
+                                      color: Dcolor.defaultText,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    weekendTextStyle: TextStyle(
+                                      color: Dcolor.stickerBlue,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    outsideTextStyle: const TextStyle(
+                                      color: Color(0xFFD1D5DB),
+                                      fontSize: 13,
+                                    ),
+                                    selectedDecoration: const BoxDecoration(
+                                      color: Color(0xFFE67E22),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    todayDecoration: const BoxDecoration(
+                                      color: Color(0xFFE67E22),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    cellMargin: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                      vertical: 10,
+                                    ),
+                                    tablePadding: EdgeInsets.zero,
+                                  ),
+                                  daysOfWeekHeight: 28,
+                                  daysOfWeekStyle: DaysOfWeekStyle(
+                                    weekdayStyle: TextStyle(
+                                      color: Dcolor.textColorGrey,
+                                      fontSize: 11,
+                                    ),
+                                    weekendStyle: TextStyle(
+                                      color: Dcolor.stickerBlue,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  calendarBuilders: CalendarBuilders(
+                                    dowBuilder: (context, day) {
+                                      const labels = [
+                                        'Sun',
+                                        'Mon',
+                                        'Tue',
+                                        'Wed',
+                                        'Thu',
+                                        'Fri',
+                                        'Sat',
+                                      ];
+                                      final label = labels[day.weekday % 7];
+                                      final color =
+                                          day.weekday == DateTime.sunday
+                                          ? Dcolor.stickerRed
+                                          : day.weekday == DateTime.saturday
+                                          ? Dcolor.stickerBlue
+                                          : Dcolor.textColorGrey;
+
+                                      return Center(
+                                        child: Text(
+                                          label,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: color,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    defaultBuilder: (context, day, focused) {
+                                      return _CalendarCell(
+                                        day: day,
+                                        diary: _diaryForDate(day),
+                                        isSelected: false,
+                                        isToday: isSameDay(day, DateTime.now()),
+                                        isOutside:
+                                            day.month != focusedDay.month,
+                                      );
+                                    },
+                                    selectedBuilder: (context, day, focused) {
+                                      return _CalendarCell(
+                                        day: day,
+                                        diary: _diaryForDate(day),
+                                        isSelected: true,
+                                        isToday: false,
+                                        isOutside:
+                                            day.month != focusedDay.month,
+                                      );
+                                    },
+                                    todayBuilder: (context, day, focused) {
+                                      return _CalendarCell(
+                                        day: day,
+                                        diary: _diaryForDate(day),
+                                        isSelected: true,
+                                        isToday: true,
+                                        isOutside:
+                                            day.month != focusedDay.month,
+                                      );
+                                    },
+                                    outsideBuilder: (context, day, focused) {
+                                      return _CalendarCell(
+                                        day: day,
+                                        diary: _diaryForDate(day),
+                                        isSelected: false,
+                                        isToday: false,
+                                        isOutside: true,
+                                      );
+                                    },
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -287,7 +345,34 @@ class _CalendarDiaryState extends State<CalendarDiary> {
   }
 }
 
-enum _DiaryAction { memo, account }
+class _PageBadge extends StatelessWidget {
+  const _PageBadge({required this.label, required this.backgroundColor});
+
+  final String label;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
 
 class _CalendarCell extends StatelessWidget {
   const _CalendarCell({
@@ -307,11 +392,15 @@ class _CalendarCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textColor = isOutside
-        ? const Color(0xFFD1D5DB)
+        ? day.weekday == DateTime.sunday
+              ? Dcolor.stickerRed
+              : day.weekday == DateTime.saturday
+              ? Dcolor.stickerBlue
+              : const Color(0xFFD1D5DB)
         : day.weekday == DateTime.sunday
-        ? const Color(0xFFF26D6D)
+        ? Dcolor.stickerRed
         : day.weekday == DateTime.saturday
-        ? const Color(0xFF4D94FF)
+        ? Dcolor.stickerBlue
         : const Color(0xFF20242A);
 
     return Padding(
@@ -324,7 +413,7 @@ class _CalendarCell extends StatelessWidget {
             height: 20,
             decoration: BoxDecoration(
               color: isSelected || isToday
-                  ? const Color(0xFF2D9CFF)
+                  ? const Color(0xFFE67E22)
                   : Colors.transparent,
               shape: BoxShape.circle,
             ),

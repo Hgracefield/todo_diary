@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import hashlib
 import hmac
 import secrets
 from datetime import date, datetime, time, timedelta
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,7 +26,7 @@ def hash_password(password: str) -> str:
     return f"pbkdf2_sha256$210000${salt}${digest}"
 
 
-def verify_password(password: str, encoded: str | None) -> bool:
+def verify_password(password: str, encoded: Optional[str]) -> bool:
     if not encoded:
         return False
     if not encoded.startswith("pbkdf2_sha256$"):
@@ -56,11 +59,11 @@ def create_user(db: Session, payload: schemas.UserCreate) -> models.User:
     return user
 
 
-def get_user(db: Session, user_id: int) -> models.User | None:
+def get_user(db: Session, user_id: int) -> Optional[models.User]:
     return db.get(models.User, user_id)
 
 
-def get_user_by_email(db: Session, email: str) -> models.User | None:
+def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     return db.scalar(select(models.User).where(models.User.user_email == email))
 
 
@@ -113,8 +116,8 @@ def create_schedule_type(
 def list_schedules(
     db: Session,
     user_id: int,
-    start_date: date | None = None,
-    end_date: date | None = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
 ) -> list[models.Schedule]:
     statement = select(models.Schedule).where(models.Schedule.user_id == user_id)
     if start_date is not None:
@@ -171,7 +174,7 @@ def create_schedule(
     return item
 
 
-def get_schedule(db: Session, schedule_id: int) -> models.Schedule | None:
+def get_schedule(db: Session, schedule_id: int) -> Optional[models.Schedule]:
     return db.get(models.Schedule, schedule_id)
 
 
@@ -196,8 +199,8 @@ def delete_instance(db: Session, item) -> None:
 def list_diaries(
     db: Session,
     user_id: int,
-    start_date: date | None = None,
-    end_date: date | None = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
 ) -> list[models.Diary]:
     statement = select(models.Diary).where(models.Diary.user_id == user_id)
     if start_date is not None:
@@ -213,13 +216,13 @@ def list_diaries(
     return list(db.scalars(statement).all())
 
 
-def get_diary(db: Session, diary_id: int) -> models.Diary | None:
+def get_diary(db: Session, diary_id: int) -> Optional[models.Diary]:
     return db.get(models.Diary, diary_id)
 
 
 def get_diary_by_date(
     db: Session, user_id: int, diary_date: date
-) -> models.Diary | None:
+) -> Optional[models.Diary]:
     start = datetime.combine(diary_date, time.min)
     end = start + timedelta(days=1)
     return db.scalar(
