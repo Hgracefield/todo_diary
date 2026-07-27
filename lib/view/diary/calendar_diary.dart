@@ -35,6 +35,13 @@ class _CalendarDiaryState extends State<CalendarDiary> {
         "${d.day.toString().padLeft(2, '0')}";
   }
 
+  bool _isTodayOrPast(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    return !target.isAfter(today);
+  }
+
   Future<void> _loadDiaries() async {
     final diaries = await db.getDiaryList();
     final nextMap = <String, Diary>{};
@@ -70,7 +77,7 @@ class _CalendarDiaryState extends State<CalendarDiary> {
           contentPadding: const EdgeInsets.fromLTRB(24, 26, 24, 8),
           actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
           content: Text(
-            '오늘의 내 역사를 작성하시겠습니까?',
+            '당신의 역사를 작성하시겠습니까?',
             style: TextStyle(
               color: Dcolor.defaultText,
               fontSize: 17,
@@ -200,6 +207,7 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                                   sixWeekMonthsEnforced: true,
                                   selectedDayPredicate: (day) =>
                                       isSameDay(selectedDay, day),
+                                  enabledDayPredicate: _isTodayOrPast,
                                   onDaySelected: (selected, focused) async {
                                     final hasDiary =
                                         _diaryForDate(selected) != null;
@@ -329,6 +337,17 @@ class _CalendarDiaryState extends State<CalendarDiary> {
                                         isOutside: true,
                                       );
                                     },
+                                    disabledBuilder: (context, day, focused) {
+                                      return _CalendarCell(
+                                        day: day,
+                                        diary: _diaryForDate(day),
+                                        isSelected: false,
+                                        isToday: false,
+                                        isOutside:
+                                            day.month != focusedDay.month,
+                                        isDisabled: true,
+                                      );
+                                    },
                                   ),
                                 ),
                         ),
@@ -381,6 +400,7 @@ class _CalendarCell extends StatelessWidget {
     required this.isSelected,
     required this.isToday,
     required this.isOutside,
+    this.isDisabled = false,
   });
 
   final DateTime day;
@@ -388,10 +408,13 @@ class _CalendarCell extends StatelessWidget {
   final bool isSelected;
   final bool isToday;
   final bool isOutside;
+  final bool isDisabled;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isOutside
+    final textColor = isDisabled
+        ? const Color(0xFFD1D5DB)
+        : isOutside
         ? day.weekday == DateTime.sunday
               ? Dcolor.stickerRed
               : day.weekday == DateTime.saturday
@@ -428,7 +451,7 @@ class _CalendarCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          if (diary != null && diary!.image.isNotEmpty)
+          if (!isDisabled && diary != null && diary!.image.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Image.memory(

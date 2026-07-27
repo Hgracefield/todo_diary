@@ -13,6 +13,14 @@ from database import get_db
 router = APIRouter(prefix="/diaries", tags=["diaries"])
 
 
+def ensure_diary_date_is_not_future(diary_date: date) -> None:
+    if diary_date > date.today():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="미래 날짜의 일기는 작성할 수 없습니다.",
+        )
+
+
 @router.get("", response_model=list[schemas.DiaryRead])
 def get_diaries(
     user_id: int = Query(alias="userId"),
@@ -41,6 +49,7 @@ def get_diary_by_date(
     status_code=status.HTTP_201_CREATED,
 )
 def create_diary(payload: schemas.DiaryCreate, db: Session = Depends(get_db)):
+    ensure_diary_date_is_not_future(payload.diary_date.date())
     existing = crud.get_diary_by_date(
         db, payload.user_id, payload.diary_date.date()
     )
@@ -56,6 +65,12 @@ def update_diary(
     item = crud.get_diary(db, diary_id)
     if item is None:
         raise HTTPException(status_code=404, detail="일기를 찾을 수 없습니다.")
+    target_date = (
+        payload.diary_date.date()
+        if payload.diary_date is not None
+        else item.diary_date.date()
+    )
+    ensure_diary_date_is_not_future(target_date)
     return crud.update_diary(db, item, payload)
 
 

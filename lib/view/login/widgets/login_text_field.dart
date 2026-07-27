@@ -15,6 +15,8 @@ class LoginTextField extends StatelessWidget {
     this.onChanged,
     this.focusNode,
     this.textColor,
+    this.suffixIcon,
+    this.obscuringCharacter = '*',
   });
 
   final TextEditingController controller;
@@ -29,6 +31,8 @@ class LoginTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final FocusNode? focusNode;
   final Color? textColor;
+  final Widget? suffixIcon;
+  final String obscuringCharacter;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +45,7 @@ class LoginTextField extends StatelessWidget {
         enabled: enabled,
         keyboardType: keyboardType,
         obscureText: obscureText,
+        obscuringCharacter: obscuringCharacter,
         readOnly: readOnly,
         onTap: onTap,
         onChanged: onChanged,
@@ -63,6 +68,7 @@ class LoginTextField extends StatelessWidget {
             letterSpacing: 0,
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          suffixIcon: suffixIcon,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none,

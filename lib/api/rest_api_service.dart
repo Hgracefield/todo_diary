@@ -19,6 +19,17 @@ class RestApiService {
     return User.fromJson(json);
   }
 
+  Future<String> findAccount({
+    required String name,
+    required String phone,
+  }) async {
+    final json = await _apiClient.post('/users/find-account', {
+      'userName': name,
+      'userPhone': phone,
+    });
+    return json['userEmail'] as String;
+  }
+
   Future<bool> isEmailAvailable(String email) async {
     final json = await _apiClient.getMap(
       '/users/check-email',

@@ -27,6 +27,23 @@ def login(payload: schemas.UserLogin, db: Session = Depends(get_db)):
     return user
 
 
+@router.post("/find-account", response_model=schemas.UserAccountLookupRead)
+def find_account(
+    payload: schemas.UserAccountLookup, db: Session = Depends(get_db)
+):
+    user = crud.get_user_by_name_and_phone(
+        db,
+        payload.user_name,
+        payload.user_phone,
+    )
+    if user is None or not user.user_email:
+        raise HTTPException(
+            status_code=404,
+            detail="일치하는 회원정보를 찾을 수 없습니다.",
+        )
+    return schemas.UserAccountLookupRead(user_email=user.user_email)
+
+
 @router.get("/check-email", response_model=schemas.Availability)
 def check_email(email: str = Query(min_length=1), db: Session = Depends(get_db)):
     return schemas.Availability(available=not crud.email_exists(db, email))

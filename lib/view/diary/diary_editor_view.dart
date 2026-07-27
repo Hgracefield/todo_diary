@@ -44,12 +44,23 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
         "${d.day.toString().padLeft(2, '0')}";
   }
 
+  bool get _isFutureDate {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final diaryDate = DateTime(
+      widget.date.year,
+      widget.date.month,
+      widget.date.day,
+    );
+    return diaryDate.isAfter(today);
+  }
+
   Future<void> _loadDiary() async {
     final loadedDiary = await db.getDiaryByDate(_dateKey(widget.date));
     List<Uint8List> loadedImages = [];
 
     if (loadedDiary != null && loadedDiary.diaryId != null) {
-      loadedImages = await db.getDiaryImages(loadedDiary.diaryId!);
+      loadedImages = await db.getDiaryImagesByDate(_dateKey(widget.date));
       if (loadedImages.isEmpty && loadedDiary.image.isNotEmpty) {
         loadedImages = [loadedDiary.image];
       }
@@ -86,6 +97,13 @@ class _DiaryEditorViewState extends State<DiaryEditorView> {
   }
 
   Future<void> _saveDiary() async {
+    if (_isFutureDate) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('미래 날짜의 일기는 작성할 수 없습니다.')));
+      return;
+    }
+
     final content = textController.text.trim();
     if (content.isEmpty && images.isEmpty) {
       Navigator.pop(context, false);

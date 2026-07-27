@@ -3,9 +3,11 @@ import 'package:my_todo_list_app/api/api_exception.dart';
 import 'package:my_todo_list_app/api/rest_api_service.dart';
 import 'package:my_todo_list_app/model/server/user.dart';
 import 'package:my_todo_list_app/storage/session_storage.dart';
+import 'package:my_todo_list_app/util/dcolor.dart';
 import 'package:my_todo_list_app/view/login/korea_city_options.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_button.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_text_field.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 class SignPage extends StatefulWidget {
   const SignPage({super.key});
@@ -15,8 +17,18 @@ class SignPage extends StatefulWidget {
 }
 
 class _SignPageState extends State<SignPage> {
+  static const List<String> _emailDomains = [
+    '@naver.com',
+    '@gmail.com',
+    '@daum.net',
+    '@kakao.com',
+    '@hanmail.net',
+  ];
+  static const String _customEmailDomain = '직접 입력';
+
   final api = RestApiService();
   final emailController = TextEditingController();
+  final customEmailDomainController = TextEditingController();
   final passwordController = TextEditingController();
   final passwordConfirmController = TextEditingController();
   final nameController = TextEditingController();
@@ -30,11 +42,24 @@ class _SignPageState extends State<SignPage> {
   bool? isPhoneAvailable;
   String? checkedPhone;
   String? selectedAddress;
+  String selectedEmailDomain = _emailDomains.first;
+  bool obscurePassword = true;
+  bool obscurePasswordConfirm = true;
+
+  String get _email {
+    final emailId = emailController.text.trim();
+    final domain = selectedEmailDomain == _customEmailDomain
+        ? customEmailDomainController.text.trim()
+        : selectedEmailDomain;
+    if (domain.isEmpty) return emailId;
+    return '$emailId${domain.startsWith('@') ? domain : '@$domain'}';
+  }
 
   @override
   void initState() {
     super.initState();
     emailController.addListener(_refreshFormState);
+    customEmailDomainController.addListener(_refreshFormState);
     passwordController.addListener(_refreshFormState);
     passwordConfirmController.addListener(_refreshFormState);
     phoneController.addListener(_refreshFormState);
@@ -43,10 +68,12 @@ class _SignPageState extends State<SignPage> {
   @override
   void dispose() {
     emailController.removeListener(_refreshFormState);
+    customEmailDomainController.removeListener(_refreshFormState);
     passwordController.removeListener(_refreshFormState);
     passwordConfirmController.removeListener(_refreshFormState);
     phoneController.removeListener(_refreshFormState);
     emailController.dispose();
+    customEmailDomainController.dispose();
     passwordController.dispose();
     passwordConfirmController.dispose();
     nameController.dispose();
@@ -56,8 +83,7 @@ class _SignPageState extends State<SignPage> {
   }
 
   void _refreshFormState() {
-    if (emailStatusText != null &&
-        emailController.text.trim() != checkedEmail) {
+    if (emailStatusText != null && _email != checkedEmail) {
       emailStatusText = null;
       isEmailAvailable = null;
       checkedEmail = null;
@@ -72,15 +98,24 @@ class _SignPageState extends State<SignPage> {
   }
 
   Future<void> _checkEmailDuplicate() async {
-    final email = emailController.text.trim();
-    if (email.isEmpty) {
+    final emailId = emailController.text.trim();
+    final customDomain = customEmailDomainController.text.trim();
+    if (emailId.isEmpty) {
       setState(() {
         isEmailAvailable = false;
-        emailStatusText = '메일주소를 입력해주세요.';
+        emailStatusText = '메일주소의 아이디를 입력해주세요.';
+      });
+      return;
+    }
+    if (selectedEmailDomain == _customEmailDomain && customDomain.isEmpty) {
+      setState(() {
+        isEmailAvailable = false;
+        emailStatusText = '메일 도메인을 입력해주세요.';
       });
       return;
     }
 
+    final email = _email;
     try {
       final available = await api.isEmailAvailable(email);
       if (!mounted) return;
@@ -126,21 +161,13 @@ class _SignPageState extends State<SignPage> {
 
   Future<void> _pickBirthDate() async {
     final now = DateTime.now();
-    final pickedDate = await showDatePicker(
+    final pickedDate = await showDialog<DateTime>(
       context: context,
-      initialDate: DateTime(now.year - 20, now.month, now.day),
-      firstDate: DateTime(1900),
-      lastDate: now,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFFA3D1C6),
-              onPrimary: Colors.white,
-              onSurface: Color(0xFF333333),
-            ),
-          ),
-          child: child!,
+      builder: (context) {
+        return _BirthDatePickerDialog(
+          initialDate: DateTime(now.year - 20, now.month, now.day),
+          firstDate: DateTime(1900),
+          lastDate: now,
         );
       },
     );
@@ -175,8 +202,7 @@ class _SignPageState extends State<SignPage> {
       _showMessage('비밀번호 확인이 일치하지 않습니다.');
       return;
     }
-    if (isEmailAvailable != true ||
-        checkedEmail != emailController.text.trim()) {
+    if (isEmailAvailable != true || checkedEmail != _email) {
       _showMessage('메일주소 중복 확인을 해주세요.');
       return;
     }
@@ -193,7 +219,7 @@ class _SignPageState extends State<SignPage> {
         User(
           userName: nameController.text.trim(),
           userBirthDate: birthDate.isEmpty ? null : birthDate,
-          userEmail: emailController.text.trim(),
+          userEmail: _email,
           userPassword: passwordController.text,
           userPhone: phoneController.text.trim(),
           userAddress: selectedAddress,
@@ -228,8 +254,8 @@ class _SignPageState extends State<SignPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFEDF2F1),
         elevation: 0,
-        foregroundColor: const Color(0xFFA3D1C6),
-        title: const Text('회원가입'),
+        foregroundColor: Dcolor.defaultText,
+        title: Text('회원가입'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -237,11 +263,20 @@ class _SignPageState extends State<SignPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _SignField(
+              _SignEmailField(
                 label: '메일주소',
-                hintText: 'example@email.com',
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
+                emailIdController: emailController,
+                customDomainController: customEmailDomainController,
+                selectedDomain: selectedEmailDomain,
+                domains: _emailDomains,
+                customDomainValue: _customEmailDomain,
+                onDomainChanged: (domain) {
+                  if (domain == null) return;
+                  setState(() {
+                    selectedEmailDomain = domain;
+                  });
+                  _refreshFormState();
+                },
                 trailing: _DuplicateCheckButton(
                   onPressed: _checkEmailDuplicate,
                 ),
@@ -254,13 +289,29 @@ class _SignPageState extends State<SignPage> {
                 label: '비밀번호',
                 hintText: '8자 이상 입력',
                 controller: passwordController,
-                obscureText: true,
+                obscureText: obscurePassword,
+                suffixIcon: _PasswordVisibilityButton(
+                  isObscured: obscurePassword,
+                  onPressed: () {
+                    setState(() {
+                      obscurePassword = !obscurePassword;
+                    });
+                  },
+                ),
               ),
               _SignField(
                 label: '비밀번호 확인',
                 hintText: '비밀번호를 다시 입력',
                 controller: passwordConfirmController,
-                obscureText: true,
+                obscureText: obscurePasswordConfirm,
+                suffixIcon: _PasswordVisibilityButton(
+                  isObscured: obscurePasswordConfirm,
+                  onPressed: () {
+                    setState(() {
+                      obscurePasswordConfirm = !obscurePasswordConfirm;
+                    });
+                  },
+                ),
                 statusText: _passwordStatusText,
                 statusColor: _passwordStatusColor,
               ),
@@ -306,6 +357,271 @@ class _SignPageState extends State<SignPage> {
                 fontSize: 16,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BirthDatePickerDialog extends StatefulWidget {
+  const _BirthDatePickerDialog({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+  });
+
+  final DateTime initialDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+
+  @override
+  State<_BirthDatePickerDialog> createState() => _BirthDatePickerDialogState();
+}
+
+class _BirthDatePickerDialogState extends State<_BirthDatePickerDialog> {
+  late DateTime selectedDate;
+  late DateTime focusedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDate = widget.initialDate;
+    focusedDate = widget.initialDate;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final datePickerTheme = Theme.of(context).datePickerTheme;
+
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              color: Dcolor.stickerGreen,
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+              child: Text(
+                '${selectedDate.year}년 '
+                '${selectedDate.month}월 ${selectedDate.day}일',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: _canMoveToPreviousMonth
+                            ? () => _moveMonth(-1)
+                            : null,
+                        icon: const Icon(Icons.chevron_left),
+                      ),
+                      Expanded(
+                        child: TextButton(
+                          onPressed: _pickYear,
+                          child: Text(
+                            '${focusedDate.year}년 ${focusedDate.month}월',
+                            style: TextStyle(
+                              color: Dcolor.defaultText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _canMoveToNextMonth
+                            ? () => _moveMonth(1)
+                            : null,
+                        icon: const Icon(Icons.chevron_right),
+                      ),
+                    ],
+                  ),
+                  TableCalendar(
+                    locale: 'ko_KR',
+                    firstDay: widget.firstDate,
+                    lastDay: widget.lastDate,
+                    focusedDay: focusedDate,
+                    headerVisible: false,
+                    rowHeight: 40,
+                    daysOfWeekHeight: 28,
+                    sixWeekMonthsEnforced: true,
+                    selectedDayPredicate: (day) => isSameDay(selectedDate, day),
+                    onDaySelected: (selected, focused) {
+                      setState(() {
+                        selectedDate = selected;
+                        focusedDate = focused;
+                      });
+                    },
+                    onPageChanged: (focused) {
+                      setState(() {
+                        focusedDate = focused;
+                      });
+                    },
+                    calendarStyle: const CalendarStyle(
+                      outsideDaysVisible: true,
+                      cellMargin: EdgeInsets.all(4),
+                    ),
+                    calendarBuilders: CalendarBuilders(
+                      dowBuilder: (context, day) {
+                        const labels = ['일', '월', '화', '수', '목', '금', '토'];
+                        return Center(
+                          child: Text(
+                            labels[day.weekday % 7],
+                            style: TextStyle(
+                              color: day.weekday == DateTime.sunday
+                                  ? Dcolor.stickerRed
+                                  : Dcolor.defaultText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      },
+                      defaultBuilder: (context, day, focused) {
+                        return _BirthDateCell(day: day);
+                      },
+                      outsideBuilder: (context, day, focused) {
+                        return _BirthDateCell(day: day, isOutside: true);
+                      },
+                      selectedBuilder: (context, day, focused) {
+                        return _BirthDateCell(day: day, isSelected: true);
+                      },
+                      todayBuilder: (context, day, focused) {
+                        return _BirthDateCell(day: day, isToday: true);
+                      },
+                      disabledBuilder: (context, day, focused) {
+                        return _BirthDateCell(day: day, isDisabled: true);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    style: datePickerTheme.cancelButtonStyle,
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('취소'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    style: datePickerTheme.confirmButtonStyle,
+                    onPressed: () => Navigator.pop(context, selectedDate),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool get _canMoveToPreviousMonth {
+    final previousMonth = DateTime(focusedDate.year, focusedDate.month - 1);
+    return !previousMonth.isBefore(
+      DateTime(widget.firstDate.year, widget.firstDate.month),
+    );
+  }
+
+  bool get _canMoveToNextMonth {
+    final nextMonth = DateTime(focusedDate.year, focusedDate.month + 1);
+    return !nextMonth.isAfter(
+      DateTime(widget.lastDate.year, widget.lastDate.month),
+    );
+  }
+
+  void _moveMonth(int offset) {
+    setState(() {
+      focusedDate = DateTime(focusedDate.year, focusedDate.month + offset);
+    });
+  }
+
+  Future<void> _pickYear() async {
+    final pickedYear = await showDialog<DateTime>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          child: SizedBox(
+            width: 320,
+            height: 360,
+            child: YearPicker(
+              firstDate: widget.firstDate,
+              lastDate: widget.lastDate,
+              selectedDate: focusedDate,
+              onChanged: (date) => Navigator.pop(context, date),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (pickedYear == null || !mounted) return;
+    setState(() {
+      focusedDate = DateTime(pickedYear.year, focusedDate.month);
+    });
+  }
+}
+
+class _BirthDateCell extends StatelessWidget {
+  const _BirthDateCell({
+    required this.day,
+    this.isSelected = false,
+    this.isToday = false,
+    this.isOutside = false,
+    this.isDisabled = false,
+  });
+
+  final DateTime day;
+  final bool isSelected;
+  final bool isToday;
+  final bool isOutside;
+  final bool isDisabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final isSunday = day.weekday == DateTime.sunday;
+    final textColor = isSunday
+        ? Dcolor.stickerRed
+        : isDisabled || isOutside
+        ? const Color(0xFFB8B8B8)
+        : Dcolor.defaultText;
+
+    return Center(
+      child: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isSelected ? Dcolor.stickerGreen : Colors.transparent,
+          shape: BoxShape.circle,
+          border: isToday && !isSelected
+              ? Border.all(color: Dcolor.stickerGreen)
+              : null,
+        ),
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
@@ -400,6 +716,217 @@ class _KoreaCityPicker extends StatelessWidget {
   }
 }
 
+class _SignEmailField extends StatelessWidget {
+  const _SignEmailField({
+    required this.label,
+    required this.emailIdController,
+    required this.customDomainController,
+    required this.selectedDomain,
+    required this.domains,
+    required this.customDomainValue,
+    required this.onDomainChanged,
+    required this.trailing,
+    this.statusText,
+    this.statusColor,
+  });
+
+  final String label;
+  final TextEditingController emailIdController;
+  final TextEditingController customDomainController;
+  final String selectedDomain;
+  final List<String> domains;
+  final String customDomainValue;
+  final ValueChanged<String?> onDomainChanged;
+  final Widget trailing;
+  final String? statusText;
+  final Color? statusColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF333333),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              Expanded(
+                flex: 6,
+                child: LoginTextField(
+                  controller: emailIdController,
+                  hintText: '아이디',
+                  keyboardType: TextInputType.emailAddress,
+                  height: 45,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 5,
+                child: selectedDomain == customDomainValue
+                    ? _CustomEmailDomainField(
+                        controller: customDomainController,
+                        domains: domains,
+                        onDomainSelected: onDomainChanged,
+                      )
+                    : _EmailDomainDropdown(
+                        value: selectedDomain,
+                        domains: domains,
+                        customDomainValue: customDomainValue,
+                        onChanged: onDomainChanged,
+                      ),
+              ),
+              const SizedBox(width: 8),
+              trailing,
+            ],
+          ),
+          if (statusText != null) ...[
+            const SizedBox(height: 5),
+            _StatusText(text: statusText!, color: statusColor),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EmailDomainDropdown extends StatelessWidget {
+  const _EmailDomainDropdown({
+    required this.value,
+    required this.domains,
+    required this.customDomainValue,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<String> domains;
+  final String customDomainValue;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 45,
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        isExpanded: true,
+        menuMaxHeight: 280,
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Color(0xFFA3D1C6),
+        ),
+        decoration: _emailDomainDecoration(),
+        style: const TextStyle(
+          color: Color(0xFF333333),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+        items: [
+          ...domains.map(
+            (domain) => DropdownMenuItem<String>(
+              value: domain,
+              child: Text(domain, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+          DropdownMenuItem<String>(
+            value: customDomainValue,
+            child: Text(customDomainValue, overflow: TextOverflow.ellipsis),
+          ),
+        ],
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _CustomEmailDomainField extends StatelessWidget {
+  const _CustomEmailDomainField({
+    required this.controller,
+    required this.domains,
+    required this.onDomainSelected,
+  });
+
+  final TextEditingController controller;
+  final List<String> domains;
+  final ValueChanged<String?> onDomainSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 45,
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.emailAddress,
+        style: const TextStyle(
+          color: Color(0xFF333333),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+        ),
+        decoration: _emailDomainDecoration().copyWith(
+          hintText: '직접 입력',
+          hintStyle: const TextStyle(
+            color: Color(0xFFDADADA),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          prefixText: '@',
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 36,
+            minHeight: 36,
+          ),
+          suffixIcon: PopupMenuButton<String>(
+            padding: EdgeInsets.zero,
+            tooltip: '메일 도메인 선택',
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFFA3D1C6),
+            ),
+            onSelected: onDomainSelected,
+            itemBuilder: (context) => domains
+                .map(
+                  (domain) =>
+                      PopupMenuItem<String>(value: domain, child: Text(domain)),
+                )
+                .toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _emailDomainDecoration() {
+  return InputDecoration(
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: Color(0xFF78BFAE), width: 1.4),
+    ),
+  );
+}
+
 class _SignField extends StatelessWidget {
   const _SignField({
     required this.label,
@@ -412,6 +939,7 @@ class _SignField extends StatelessWidget {
     this.statusColor,
     this.readOnly = false,
     this.onTap,
+    this.suffixIcon,
   });
 
   final String label;
@@ -424,6 +952,7 @@ class _SignField extends StatelessWidget {
   final Color? statusColor;
   final bool readOnly;
   final VoidCallback? onTap;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -452,6 +981,7 @@ class _SignField extends StatelessWidget {
                   obscureText: obscureText,
                   readOnly: readOnly,
                   onTap: onTap,
+                  suffixIcon: suffixIcon,
                   height: 45,
                   fontSize: 16,
                 ),
@@ -464,6 +994,29 @@ class _SignField extends StatelessWidget {
             _StatusText(text: statusText!, color: statusColor),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _PasswordVisibilityButton extends StatelessWidget {
+  const _PasswordVisibilityButton({
+    required this.isObscured,
+    required this.onPressed,
+  });
+
+  final bool isObscured;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: isObscured ? '비밀번호 보기' : '비밀번호 숨기기',
+      icon: Icon(
+        isObscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        color: const Color(0xFFA3D1C6),
+        size: 21,
       ),
     );
   }

@@ -67,6 +67,31 @@ def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
     return db.scalar(select(models.User).where(models.User.user_email == email))
 
 
+def get_user_by_name_and_phone(
+    db: Session, name: str, phone: str
+) -> Optional[models.User]:
+    normalized_phone = "".join(character for character in phone if character.isdigit())
+    if not normalized_phone:
+        return None
+
+    users = db.scalars(
+        select(models.User).where(models.User.user_name == name.strip())
+    ).all()
+    return next(
+        (
+            user
+            for user in users
+            if "".join(
+                character
+                for character in (user.user_phone or "")
+                if character.isdigit()
+            )
+            == normalized_phone
+        ),
+        None,
+    )
+
+
 def email_exists(db: Session, email: str) -> bool:
     return get_user_by_email(db, email) is not None
 

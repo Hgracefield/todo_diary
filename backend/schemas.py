@@ -44,6 +44,15 @@ class UserLogin(ApiModel):
     user_password: str
 
 
+class UserAccountLookup(ApiModel):
+    user_name: str = Field(min_length=1, max_length=45)
+    user_phone: str = Field(min_length=1, max_length=20)
+
+
+class UserAccountLookupRead(ApiModel):
+    user_email: str
+
+
 class UserRead(ApiModel):
     user_id: int
     user_name: Optional[str] = None

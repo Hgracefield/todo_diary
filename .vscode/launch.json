@@ -1,0 +1,62 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend API (FastAPI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "justMyCode": false
+    },
+    {
+      "name": "Flutter (macOS)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "macos",
+      "preLaunchTask": "Ensure Backend API",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://127.0.0.1:8000/api"
+      ]
+    },
+    {
+      "name": "Flutter (Chrome)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "preLaunchTask": "Ensure Backend API",
+      "toolArgs": [
+        "--dart-define=API_BASE_URL=http://127.0.0.1:8000/api"
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Backend API + Flutter (macOS)",
+      "configurations": [
+        "Backend API (FastAPI)",
+        "Flutter (macOS)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Backend API + Flutter (Chrome)",
+      "configurations": [
+        "Backend API (FastAPI)",
+        "Flutter (Chrome)"
+      ],
+      "stopAll": true
+    }
+  ]
+}

@@ -167,7 +167,7 @@ class _LoginPageState extends State<LoginPage> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final height = constraints.maxHeight;
-            final logoHeight = (height * 0.115).clamp(72.0, 98.0);
+            final logoHeight = (height * 0.135).clamp(92.0, 115.0);
             final logoWidth = logoHeight * 2.25;
             const fieldHeight = 45.0;
             final buttonHeight = (height * 0.068).clamp(52.0, 62.0);
@@ -181,26 +181,26 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   SizedBox(height: height * 0.07),
                   Image.asset(
-                    'images/lalo-icon.png',
+                    'images/writelog-logo.png',
                     width: logoWidth,
                     height: logoHeight,
                     fit: BoxFit.contain,
                   ),
-                  SizedBox(height: height * 0.04),
+                  SizedBox(height: height * 0.07),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '라이프를 더 쉽게 정리하고,\n로그로 더 오래 기억하는 나만의 하루 기록 앱',
                       style: TextStyle(
                         color: Color.fromARGB(255, 163, 209, 198),
-                        fontSize: 12,
+                        fontSize: 14,
                         height: 1.35,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0,
                       ),
                     ),
                   ),
-                  SizedBox(height: height * 0.075),
+                  SizedBox(height: height * 0.02),
                   _SplitEmailField(
                     controller: emailIdController,
                     focusNode: emailFocusNode,

@@ -254,7 +254,7 @@ class _LifeLogHomeState extends State<LifeLogHome> {
                 child: Text(
                   sectionTitle,
                   style: TextStyle(
-                    fontSize: showDate ? 18 : 26,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Dcolor.defaultText,
                   ),

@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ensure Backend API",
+      "type": "shell",
+      "command": "if /usr/bin/curl -fsS http://127.0.0.1:8000/ >/dev/null 2>&1; then echo 'Backend already running'; exit 0; fi; exec \"${workspaceFolder}/.venv/bin/python\" -m uvicorn main:app --reload --host 127.0.0.1 --port 8000",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/backend"
+        }
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(Started server process|Backend already running).*",
+          "endsPattern": ".*(Uvicorn running on|Backend already running).*"
+        }
+      }
+    }
+  ]
+}

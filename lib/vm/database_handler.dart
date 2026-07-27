@@ -42,7 +42,7 @@ class DatabaseHandler {
     final path = join(await getDatabasesPath(), 'my_todo_app2.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -60,9 +60,11 @@ class DatabaseHandler {
     await db.execute('''
       CREATE TABLE diary (
         diaryId INTEGER PRIMARY KEY AUTOINCREMENT,
-        diaryDate TEXT NOT NULL UNIQUE,
+        userId INTEGER NOT NULL,
+        diaryDate TEXT NOT NULL,
         content TEXT NOT NULL,
-        image BLOB NOT NULL
+        image BLOB NOT NULL,
+        UNIQUE(userId, diaryDate)
       )
     ''');
 
@@ -126,6 +128,41 @@ class DatabaseHandler {
         "ALTER TABLE memo ADD COLUMN time TEXT NOT NULL DEFAULT '00:00'",
       );
     }
+    if (oldVersion < 4) {
+      await db.execute('ALTER TABLE diary_image RENAME TO diary_image_v3');
+      await db.execute('ALTER TABLE diary RENAME TO diary_v3');
+      await db.execute('''
+        CREATE TABLE diary (
+          diaryId INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          diaryDate TEXT NOT NULL,
+          content TEXT NOT NULL,
+          image BLOB NOT NULL,
+          UNIQUE(userId, diaryDate)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE diary_image (
+          diaryImageId INTEGER PRIMARY KEY AUTOINCREMENT,
+          diaryId INTEGER NOT NULL,
+          image BLOB NOT NULL,
+          sortOrder INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (diaryId) REFERENCES diary(diaryId)
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO diary (diaryId, userId, diaryDate, content, image)
+        SELECT diaryId, 0, diaryDate, content, image
+        FROM diary_v3
+      ''');
+      await db.execute('''
+        INSERT INTO diary_image (diaryImageId, diaryId, image, sortOrder)
+        SELECT diaryImageId, diaryId, image, sortOrder
+        FROM diary_image_v3
+      ''');
+      await db.execute('DROP TABLE diary_image_v3');
+      await db.execute('DROP TABLE diary_v3');
+    }
   }
 
   Future<int> insertCategory(Category category) async {
@@ -148,9 +185,11 @@ class DatabaseHandler {
   }
 
   Future<int> insertDiary(Diary diary, {List<Uint8List>? images}) async {
+    final userId = await _requireUserId();
     final db = await database;
     final localId = await db.transaction((txn) async {
       final diaryId = await txn.insert('diary', {
+        'userId': userId,
         'diaryDate': diary.diaryDate,
         'content': diary.content,
         'image': diary.image,
@@ -165,22 +204,20 @@ class DatabaseHandler {
   }
 
   Future<List<Diary>> getDiaryList() async {
+    final userId = await _requireUserId();
     final db = await database;
-    final result = await db.query('diary', orderBy: 'diaryDate DESC');
-    final local = result.map((e) => Diary.fromMap(e)).toList();
-    final byDate = {for (final diary in local) diary.diaryDate: diary};
-
-    final userId = await SessionStorage.userId();
-    if (userId == null) return local;
-
     try {
       final remote = await _api.getDiaries(userId: userId);
+      await _claimMatchingLegacyDiaries(db, userId, remote);
+      final local = await _getLocalDiaries(db, userId);
+      final byDate = {for (final diary in local) diary.diaryDate: diary};
       for (final diary in remote) {
         final date = _dateOnly(diary.diaryDate);
         byDate.putIfAbsent(
           date,
           () => Diary(
             diaryId: diary.diaryId,
+            userId: userId,
             diaryDate: date,
             content: diary.diaryContent ?? '',
             image: Uint8List(0),
@@ -191,47 +228,51 @@ class DatabaseHandler {
         ..sort((a, b) => b.diaryDate.compareTo(a.diaryDate));
       return merged;
     } catch (_) {
-      return local;
+      return _getLocalDiaries(db, userId);
     }
   }
 
   Future<int> deleteDiary(int id) async {
+    final userId = await _requireUserId();
     final db = await database;
     final rows = await db.query(
       'diary',
       columns: ['diaryDate'],
-      where: 'diaryId = ?',
-      whereArgs: [id],
+      where: 'diaryId = ? AND userId = ?',
+      whereArgs: [id, userId],
       limit: 1,
     );
     final deleted = await db.transaction((txn) async {
+      if (rows.isEmpty) return 0;
       await txn.delete('diary_image', where: 'diaryId = ?', whereArgs: [id]);
-      return txn.delete('diary', where: 'diaryId = ?', whereArgs: [id]);
+      return txn.delete(
+        'diary',
+        where: 'diaryId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
     });
     if (rows.isNotEmpty) {
-      final userId = await SessionStorage.userId();
-      if (userId != null) {
-        try {
-          final remote = await _api.getDiaryByDate(
-            userId: userId,
-            date: rows.first['diaryDate'] as String,
-          );
-          if (remote?.diaryId != null) {
-            await _api.deleteDiary(remote!.diaryId!);
-          }
-        } catch (_) {}
-      }
+      try {
+        final remote = await _api.getDiaryByDate(
+          userId: userId,
+          date: rows.first['diaryDate'] as String,
+        );
+        if (remote?.diaryId != null) {
+          await _api.deleteDiary(remote!.diaryId!);
+        }
+      } catch (_) {}
     }
     return deleted;
   }
 
   Future<int> deleteDiaryByDate(String date) async {
+    final userId = await _requireUserId();
     final db = await database;
     final rows = await db.query(
       'diary',
       columns: ['diaryId'],
-      where: 'diaryDate = ?',
-      whereArgs: [date],
+      where: 'diaryDate = ? AND userId = ?',
+      whereArgs: [date, userId],
     );
     final localIds = rows.map((row) => row['diaryId'] as int).toList();
 
@@ -239,39 +280,40 @@ class DatabaseHandler {
       for (final id in localIds) {
         await txn.delete('diary_image', where: 'diaryId = ?', whereArgs: [id]);
       }
-      return txn.delete('diary', where: 'diaryDate = ?', whereArgs: [date]);
+      return txn.delete(
+        'diary',
+        where: 'diaryDate = ? AND userId = ?',
+        whereArgs: [date, userId],
+      );
     });
 
-    final userId = await SessionStorage.userId();
-    if (userId != null) {
-      try {
-        final remote = await _api.getDiaryByDate(userId: userId, date: date);
-        if (remote?.diaryId != null) {
-          await _api.deleteDiary(remote!.diaryId!);
-        }
-      } catch (_) {}
-    }
+    try {
+      final remote = await _api.getDiaryByDate(userId: userId, date: date);
+      if (remote?.diaryId != null) {
+        await _api.deleteDiary(remote!.diaryId!);
+      }
+    } catch (_) {}
 
     return deleted;
   }
 
   Future<Diary?> getDiaryByDate(String date) async {
+    final userId = await _requireUserId();
     final db = await database;
     final result = await db.query(
       'diary',
-      where: 'diaryDate = ?',
-      whereArgs: [date],
+      where: 'diaryDate = ? AND userId = ?',
+      whereArgs: [date, userId],
     );
 
     if (result.isNotEmpty) return Diary.fromMap(result.first);
 
-    final userId = await SessionStorage.userId();
-    if (userId == null) return null;
     try {
       final remote = await _api.getDiaryByDate(userId: userId, date: date);
       if (remote == null) return null;
       return Diary(
         diaryId: remote.diaryId,
+        userId: userId,
         diaryDate: _dateOnly(remote.diaryDate),
         content: remote.diaryContent ?? '',
         image: Uint8List(0),
@@ -282,22 +324,24 @@ class DatabaseHandler {
   }
 
   Future<int> updateDiaryText(int id, String text) async {
+    final userId = await _requireUserId();
     final db = await database;
     return db.update(
       'diary',
       {'content': text},
-      where: 'diaryId = ?',
-      whereArgs: [id],
+      where: 'diaryId = ? AND userId = ?',
+      whereArgs: [id, userId],
     );
   }
 
   Future<int> updateDiaryImage(int id, Uint8List image) async {
+    final userId = await _requireUserId();
     final db = await database;
     return db.update(
       'diary',
       {'image': image},
-      where: 'diaryId = ?',
-      whereArgs: [id],
+      where: 'diaryId = ? AND userId = ?',
+      whereArgs: [id, userId],
     );
   }
 
@@ -307,25 +351,45 @@ class DatabaseHandler {
     List<Uint8List> images, {
     String? diaryDate,
   }) async {
+    final userId = await _requireUserId();
     final db = await database;
     final coverImage = images.isEmpty ? Uint8List(0) : images.first;
     var savedLocalId = id;
 
     await db.transaction((txn) async {
-      final updated = await txn.update(
-        'diary',
-        {'content': content, 'image': coverImage},
-        where: 'diaryId = ?',
-        whereArgs: [id],
-      );
-      var localId = id;
-      if (updated == 0) {
+      final existing = diaryDate == null || diaryDate.isEmpty
+          ? await txn.query(
+              'diary',
+              columns: ['diaryId'],
+              where: 'diaryId = ? AND userId = ?',
+              whereArgs: [id, userId],
+              limit: 1,
+            )
+          : await txn.query(
+              'diary',
+              columns: ['diaryId'],
+              where: 'diaryDate = ? AND userId = ?',
+              whereArgs: [diaryDate, userId],
+              limit: 1,
+            );
+
+      late int localId;
+      if (existing.isEmpty) {
         if (diaryDate == null || diaryDate.isEmpty) return;
         localId = await txn.insert('diary', {
+          'userId': userId,
           'diaryDate': diaryDate,
           'content': content,
           'image': coverImage,
         });
+      } else {
+        localId = existing.first['diaryId'] as int;
+        await txn.update(
+          'diary',
+          {'content': content, 'image': coverImage},
+          where: 'diaryId = ? AND userId = ?',
+          whereArgs: [localId, userId],
+        );
       }
       savedLocalId = localId;
       await _replaceDiaryImagesTxn(txn, localId, images);
@@ -333,8 +397,8 @@ class DatabaseHandler {
 
     final rows = await db.query(
       'diary',
-      where: 'diaryId = ?',
-      whereArgs: [savedLocalId],
+      where: 'diaryId = ? AND userId = ?',
+      whereArgs: [savedLocalId, userId],
       limit: 1,
     );
     if (rows.isNotEmpty) {
@@ -343,12 +407,33 @@ class DatabaseHandler {
   }
 
   Future<List<Uint8List>> getDiaryImages(int diaryId) async {
+    final userId = await _requireUserId();
     final db = await database;
-    final result = await db.query(
-      'diary_image',
-      where: 'diaryId = ?',
-      whereArgs: [diaryId],
-      orderBy: 'sortOrder ASC, diaryImageId ASC',
+    final result = await db.rawQuery(
+      '''
+      SELECT diary_image.image
+      FROM diary_image
+      INNER JOIN diary ON diary.diaryId = diary_image.diaryId
+      WHERE diary_image.diaryId = ? AND diary.userId = ?
+      ORDER BY diary_image.sortOrder ASC, diary_image.diaryImageId ASC
+      ''',
+      [diaryId, userId],
+    );
+    return result.map((row) => row['image'] as Uint8List).toList();
+  }
+
+  Future<List<Uint8List>> getDiaryImagesByDate(String date) async {
+    final userId = await _requireUserId();
+    final db = await database;
+    final result = await db.rawQuery(
+      '''
+      SELECT diary_image.image
+      FROM diary_image
+      INNER JOIN diary ON diary.diaryId = diary_image.diaryId
+      WHERE diary.diaryDate = ? AND diary.userId = ?
+      ORDER BY diary_image.sortOrder ASC, diary_image.diaryImageId ASC
+      ''',
+      [date, userId],
     );
     return result.map((row) => row['image'] as Uint8List).toList();
   }
@@ -366,6 +451,49 @@ class DatabaseHandler {
         'image': images[i],
         'sortOrder': i,
       });
+    }
+  }
+
+  Future<int> _requireUserId() async {
+    final userId = await SessionStorage.userId();
+    if (userId == null) {
+      throw StateError('로그인한 사용자 정보가 없습니다.');
+    }
+    return userId;
+  }
+
+  Future<List<Diary>> _getLocalDiaries(Database db, int userId) async {
+    final result = await db.query(
+      'diary',
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'diaryDate DESC',
+    );
+    return result.map(Diary.fromMap).toList();
+  }
+
+  Future<void> _claimMatchingLegacyDiaries(
+    Database db,
+    int userId,
+    List<server.ServerDiary> remoteDiaries,
+  ) async {
+    for (final remote in remoteDiaries) {
+      final date = _dateOnly(remote.diaryDate);
+      final current = await db.query(
+        'diary',
+        columns: ['diaryId'],
+        where: 'userId = ? AND diaryDate = ?',
+        whereArgs: [userId, date],
+        limit: 1,
+      );
+      if (current.isNotEmpty) continue;
+
+      await db.update(
+        'diary',
+        {'userId': userId},
+        where: 'userId = 0 AND diaryDate = ? AND content = ?',
+        whereArgs: [date, remote.diaryContent ?? ''],
+      );
     }
   }
 
