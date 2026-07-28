@@ -6,6 +6,7 @@ import 'package:my_todo_list_app/view/login/korea_city_options.dart';
 import 'package:my_todo_list_app/view/login/login_page.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_button.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_text_field.dart';
+import 'package:my_todo_list_app/view/report/schedule_report_page.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -260,9 +261,10 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   void _openScheduleReport() {
-    ScaffoldMessenger.of(
+    Navigator.push(
       context,
-    ).showSnackBar(const SnackBar(content: Text('일정 리포트는 준비 중입니다.')));
+      MaterialPageRoute(builder: (context) => const ScheduleReportPage()),
+    );
   }
 
   @override
