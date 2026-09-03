@@ -153,6 +153,7 @@ class _FindPasswordPageState extends State<FindPasswordPage> {
                 controller: phoneController,
                 hintText: '핸드폰번호',
                 keyboardType: TextInputType.phone,
+                formatAsPhoneNumber: true,
                 height: 45,
                 fontSize: 16,
               ),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:my_todo_list_app/api/api_exception.dart';
 import 'package:my_todo_list_app/api/rest_api_service.dart';
-import 'package:my_todo_list_app/model/server/user.dart';
 import 'package:my_todo_list_app/storage/session_storage.dart';
+import 'package:my_todo_list_app/util/phone_number_input_formatter.dart';
 import 'package:my_todo_list_app/view/login/korea_city_options.dart';
 import 'package:my_todo_list_app/view/login/login_page.dart';
 import 'package:my_todo_list_app/view/login/widgets/login_button.dart';
@@ -29,8 +30,13 @@ class _AccountPageState extends State<AccountPage> {
   String? phoneStatusText;
   bool? isPhoneAvailable;
   String? checkedPhone;
-  String savedPassword = '';
+  String originalName = '';
+  String originalBirthDate = '';
+  String originalPhoneDigits = '';
+  String? originalAddress;
+  int? currentUserId;
   bool isLoading = true;
+  final Set<String> savingFields = <String>{};
 
   @override
   void initState() {
@@ -39,6 +45,8 @@ class _AccountPageState extends State<AccountPage> {
     passwordController.addListener(_refreshPasswordState);
     newPasswordController.addListener(_refreshPasswordState);
     passwordConfirmController.addListener(_refreshPasswordState);
+    nameController.addListener(_refreshFieldState);
+    birthDateController.addListener(_refreshFieldState);
     _loadProfile();
   }
 
@@ -48,6 +56,8 @@ class _AccountPageState extends State<AccountPage> {
     passwordController.removeListener(_refreshPasswordState);
     newPasswordController.removeListener(_refreshPasswordState);
     passwordConfirmController.removeListener(_refreshPasswordState);
+    nameController.removeListener(_refreshFieldState);
+    birthDateController.removeListener(_refreshFieldState);
     emailController.dispose();
     passwordController.dispose();
     passwordConfirmController.dispose();
@@ -80,9 +90,13 @@ class _AccountPageState extends State<AccountPage> {
       emailController.text = profile.email;
       nameController.text = profile.name;
       birthDateController.text = profile.birthDate;
-      phoneController.text = profile.phone;
+      phoneController.text = formatPhoneNumber(profile.phone);
+      originalName = profile.name;
+      originalBirthDate = profile.birthDate;
+      originalPhoneDigits = phoneNumberDigits(profile.phone);
       selectedAddress = profile.address;
-      savedPassword = profile.password;
+      originalAddress = profile.address;
+      currentUserId = profile.userId;
       isLoading = false;
     });
   }
@@ -99,24 +113,55 @@ class _AccountPageState extends State<AccountPage> {
 
   void _refreshPasswordState() {
     if (!mounted) return;
-    if (!_isCurrentPasswordValid &&
-        (newPasswordController.text.isNotEmpty ||
-            passwordConfirmController.text.isNotEmpty)) {
-      newPasswordController.clear();
-      passwordConfirmController.clear();
-    }
     setState(() {});
   }
 
-  bool get _isCurrentPasswordValid {
-    return passwordController.text.isNotEmpty &&
-        passwordController.text == savedPassword;
+  void _refreshFieldState() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   bool get _isPasswordConfirmed {
     final password = newPasswordController.text;
     final confirm = passwordConfirmController.text;
     return password.isNotEmpty && confirm.isNotEmpty && password == confirm;
+  }
+
+  bool get _canChangePassword {
+    return !savingFields.contains('password') &&
+        passwordController.text.isNotEmpty &&
+        _isPasswordConfirmed;
+  }
+
+  bool get _canChangeName {
+    final name = nameController.text.trim();
+    return !savingFields.contains('name') &&
+        name.isNotEmpty &&
+        name != originalName;
+  }
+
+  bool get _canChangeBirthDate {
+    final birthDate = birthDateController.text.trim();
+    return !savingFields.contains('birthDate') &&
+        birthDate.isNotEmpty &&
+        birthDate != originalBirthDate;
+  }
+
+  bool get _canChangePhone {
+    final phoneDigits = phoneNumberDigits(phoneController.text);
+    if (phoneDigits.isEmpty) return false;
+    if (phoneDigits == originalPhoneDigits) return false;
+
+    return !savingFields.contains('phone') &&
+        isPhoneAvailable == true &&
+        checkedPhone != null &&
+        phoneNumberDigits(checkedPhone!) == phoneDigits;
+  }
+
+  bool get _canChangeAddress {
+    return !savingFields.contains('address') &&
+        selectedAddress != null &&
+        selectedAddress != originalAddress;
   }
 
   String? get _passwordStatusText {
@@ -134,18 +179,46 @@ class _AccountPageState extends State<AccountPage> {
         : const Color(0xFFE44848);
   }
 
-  void _checkPhoneDuplicate() {
+  Future<void> _checkPhoneDuplicate() async {
     final phone = phoneController.text.trim();
-    setState(() {
-      if (phone.isEmpty) {
+    final phoneDigits = phoneNumberDigits(phone);
+    if (phoneDigits.isEmpty) {
+      setState(() {
         isPhoneAvailable = false;
         phoneStatusText = '핸드폰번호를 입력해주세요.';
-      } else {
+      });
+      return;
+    }
+
+    if (phoneDigits == originalPhoneDigits) {
+      setState(() {
         isPhoneAvailable = true;
         checkedPhone = phone;
-        phoneStatusText = '사용 가능한 핸드폰번호입니다.';
-      }
-    });
+        phoneStatusText = '현재 사용 중인 핸드폰번호입니다.';
+      });
+      return;
+    }
+
+    try {
+      final available = await api.isPhoneAvailable(
+        phone,
+        excludeUserId: currentUserId,
+      );
+      if (!mounted) return;
+      setState(() {
+        isPhoneAvailable = available;
+        checkedPhone = phone;
+        phoneStatusText = available ? '사용 가능한 핸드폰번호입니다.' : '이미 사용 중인 핸드폰번호입니다.';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        isPhoneAvailable = null;
+        checkedPhone = null;
+        phoneStatusText = null;
+      });
+      _showMessage('중복 확인 중 서버에 연결할 수 없습니다.');
+    }
   }
 
   Future<void> _pickBirthDate() async {
@@ -180,64 +253,136 @@ class _AccountPageState extends State<AccountPage> {
     });
   }
 
-  Future<void> _saveProfile() async {
-    final oldProfile = await SessionStorage.loadProfile();
+  Future<void> _changePassword() async {
+    if (!_canChangePassword) return;
+    final userId = currentUserId;
+    if (userId == null) {
+      _showMessage('로그인 정보를 확인할 수 없습니다.');
+      return;
+    }
+
     final currentPassword = passwordController.text;
     final newPassword = newPasswordController.text;
-    final passwordConfirm = passwordConfirmController.text;
-    final wantsPasswordChange =
-        currentPassword.isNotEmpty ||
-        newPassword.isNotEmpty ||
-        passwordConfirm.isNotEmpty;
-
-    if (wantsPasswordChange && !_isCurrentPasswordValid) {
-      _showMessage('원래 비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    if (wantsPasswordChange && !_isPasswordConfirmed) {
-      _showMessage('새 비밀번호와 새 비밀번호 확인이 일치하지 않습니다.');
-      return;
-    }
-
-    final profile = AccountProfile(
-      userId: oldProfile.userId,
-      email: emailController.text.trim(),
-      password: wantsPasswordChange ? newPassword : oldProfile.password,
-      name: nameController.text.trim(),
-      birthDate: birthDateController.text.trim(),
-      phone: phoneController.text.trim(),
-      address: selectedAddress,
-    );
-
-    if (profile.userId != null) {
-      try {
-        final birthDate = profile.birthDate.replaceAll('.', '-');
-        await api.updateUser(
-          profile.userId!,
-          User(
-            userId: profile.userId,
-            userName: profile.name,
-            userBirthDate: birthDate.isEmpty ? null : birthDate,
-            userEmail: profile.email,
-            userPassword: wantsPasswordChange ? profile.password : null,
-            userPhone: profile.phone,
-            userAddress: profile.address,
-          ),
-        );
-      } catch (_) {
-        if (!mounted) return;
-        _showMessage('서버에 계정 정보를 저장하지 못했습니다.');
-        return;
+    setState(() => savingFields.add('password'));
+    try {
+      await api.updateUserPassword(
+        userId: userId,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      final profile = await SessionStorage.loadProfile();
+      await SessionStorage.saveProfile(profile.copyWith(password: newPassword));
+      if (!mounted) return;
+      passwordController.clear();
+      newPasswordController.clear();
+      passwordConfirmController.clear();
+      _showMessage('비밀번호가 변경되었습니다.');
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        error.statusCode == 401 ? '현재 비밀번호가 일치하지 않습니다.' : '비밀번호를 변경하지 못했습니다.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('비밀번호를 변경하지 못했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => savingFields.remove('password'));
       }
     }
-    await SessionStorage.saveProfile(profile);
-    if (!mounted) return;
-    savedPassword = profile.password;
-    passwordController.clear();
-    passwordConfirmController.clear();
-    newPasswordController.clear();
-    _showMessage('계정 정보가 저장되었습니다.');
+  }
+
+  Future<void> _changeName() async {
+    final name = nameController.text.trim();
+    if (!_canChangeName) return;
+    await _updateAccountField(
+      field: 'name',
+      values: {'userName': name},
+      updateProfile: (profile) => profile.copyWith(name: name),
+      onSaved: () => originalName = name,
+      successMessage: '이름이 변경되었습니다.',
+    );
+  }
+
+  Future<void> _changeBirthDate() async {
+    final birthDate = birthDateController.text.trim();
+    if (!_canChangeBirthDate) return;
+    await _updateAccountField(
+      field: 'birthDate',
+      values: {'userBirthDate': birthDate.replaceAll('.', '-')},
+      updateProfile: (profile) => profile.copyWith(birthDate: birthDate),
+      onSaved: () => originalBirthDate = birthDate,
+      successMessage: '생년월일이 변경되었습니다.',
+    );
+  }
+
+  Future<void> _changePhone() async {
+    if (!_canChangePhone) return;
+    final phone = phoneController.text.trim();
+    await _updateAccountField(
+      field: 'phone',
+      values: {'userPhone': phone},
+      updateProfile: (profile) => profile.copyWith(phone: phone),
+      onSaved: () {
+        originalPhoneDigits = phoneNumberDigits(phone);
+        checkedPhone = phone;
+        isPhoneAvailable = true;
+        phoneStatusText = '현재 사용 중인 핸드폰번호입니다.';
+      },
+      successMessage: '핸드폰번호가 변경되었습니다.',
+      duplicatePhoneMessage: true,
+    );
+  }
+
+  Future<void> _changeAddress() async {
+    final address = selectedAddress;
+    if (!_canChangeAddress || address == null) return;
+    await _updateAccountField(
+      field: 'address',
+      values: {'userAddress': address},
+      updateProfile: (profile) => profile.copyWith(address: address),
+      onSaved: () => originalAddress = address,
+      successMessage: '주소가 변경되었습니다.',
+    );
+  }
+
+  Future<void> _updateAccountField({
+    required String field,
+    required Map<String, dynamic> values,
+    required AccountProfile Function(AccountProfile profile) updateProfile,
+    required VoidCallback onSaved,
+    required String successMessage,
+    bool duplicatePhoneMessage = false,
+  }) async {
+    final userId = currentUserId;
+    if (userId == null) {
+      _showMessage('로그인 정보를 확인할 수 없습니다.');
+      return;
+    }
+
+    setState(() => savingFields.add(field));
+    try {
+      await api.updateUserFields(userId, values);
+      final profile = await SessionStorage.loadProfile();
+      await SessionStorage.saveProfile(updateProfile(profile));
+      if (!mounted) return;
+      setState(onSaved);
+      _showMessage(successMessage);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showMessage(
+        duplicatePhoneMessage && error.statusCode == 409
+            ? '이미 사용 중인 핸드폰번호입니다.'
+            : '회원정보를 변경하지 못했습니다.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('회원정보를 변경하지 못했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => savingFields.remove(field));
+      }
+    }
   }
 
   void _showMessage(String message) {
@@ -293,8 +438,8 @@ class _AccountPageState extends State<AccountPage> {
                       textColor: Color(0xFF999999),
                     ),
                     _AccountField(
-                      label: '비밀번호 (변경을 원하면 원래 비밀번호를 입력해주세요)',
-                      hintText: '원래 비밀번호를 입력',
+                      label: '현재 비밀번호',
+                      hintText: '현재 비밀번호를 입력',
                       controller: passwordController,
                       obscureText: true,
                     ),
@@ -303,14 +448,18 @@ class _AccountPageState extends State<AccountPage> {
                       hintText: '새 비밀번호를 입력',
                       controller: newPasswordController,
                       obscureText: true,
-                      enabled: _isCurrentPasswordValid,
+                      enabled: passwordController.text.isNotEmpty,
                     ),
                     _AccountField(
                       label: '새 비밀번호 확인',
                       hintText: '새 비밀번호를 다시 입력',
                       controller: passwordConfirmController,
                       obscureText: true,
-                      enabled: _isCurrentPasswordValid,
+                      enabled: passwordController.text.isNotEmpty,
+                      trailing: _SmallButton(
+                        label: '비밀번호 변경',
+                        onPressed: _canChangePassword ? _changePassword : null,
+                      ),
                       statusText: _passwordStatusText,
                       statusColor: _passwordStatusColor,
                     ),
@@ -319,6 +468,10 @@ class _AccountPageState extends State<AccountPage> {
                       label: '이름',
                       hintText: '홍길동',
                       controller: nameController,
+                      trailing: _SmallButton(
+                        label: '이름 변경',
+                        onPressed: _canChangeName ? _changeName : null,
+                      ),
                     ),
                     _AccountField(
                       label: '생년월일',
@@ -326,15 +479,26 @@ class _AccountPageState extends State<AccountPage> {
                       controller: birthDateController,
                       readOnly: true,
                       onTap: _pickBirthDate,
+                      trailing: _SmallButton(
+                        label: '생년월일 변경',
+                        onPressed: _canChangeBirthDate
+                            ? _changeBirthDate
+                            : null,
+                      ),
                     ),
                     _AccountField(
                       label: '핸드폰번호',
                       hintText: '010-1234-5678',
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
+                      formatAsPhoneNumber: true,
                       trailing: _SmallButton(
                         label: '중복확인',
                         onPressed: _checkPhoneDuplicate,
+                      ),
+                      action: _SmallButton(
+                        label: '핸드폰번호 변경',
+                        onPressed: _canChangePhone ? _changePhone : null,
                       ),
                       statusText: phoneStatusText,
                       statusColor: isPhoneAvailable == true
@@ -348,30 +512,18 @@ class _AccountPageState extends State<AccountPage> {
                           selectedAddress = value;
                         });
                       },
+                      trailing: _SmallButton(
+                        label: '주소 변경',
+                        onPressed: _canChangeAddress ? _changeAddress : null,
+                      ),
                     ),
                     const SizedBox(height: 28),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: LoginButton(
-                            label: '뒤로가기',
-                            onPressed: _goBack,
-                            backgroundColor: const Color(0xFFA3D1C6),
-                            height: 52,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: LoginButton(
-                            label: '저장',
-                            onPressed: _saveProfile,
-                            backgroundColor: const Color(0xFFE67E22),
-                            height: 52,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                    LoginButton(
+                      label: '뒤로가기',
+                      onPressed: _goBack,
+                      backgroundColor: const Color(0xFFA3D1C6),
+                      height: 52,
+                      fontSize: 16,
                     ),
                     const SizedBox(height: 12),
                     LoginButton(
@@ -411,6 +563,8 @@ class _AccountField extends StatelessWidget {
     this.enabled = true,
     this.onTap,
     this.textColor,
+    this.formatAsPhoneNumber = false,
+    this.action,
   });
 
   final String label;
@@ -425,6 +579,8 @@ class _AccountField extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onTap;
   final Color? textColor;
+  final bool formatAsPhoneNumber;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -455,6 +611,7 @@ class _AccountField extends StatelessWidget {
                   enabled: enabled,
                   onTap: onTap,
                   textColor: textColor,
+                  formatAsPhoneNumber: formatAsPhoneNumber,
                   height: 45,
                   fontSize: 16,
                 ),
@@ -474,6 +631,10 @@ class _AccountField extends StatelessWidget {
               ),
             ),
           ],
+          if (action != null) ...[
+            const SizedBox(height: 6),
+            Align(alignment: Alignment.centerRight, child: action!),
+          ],
         ],
       ),
     );
@@ -481,10 +642,15 @@ class _AccountField extends StatelessWidget {
 }
 
 class _AccountCityPicker extends StatelessWidget {
-  const _AccountCityPicker({required this.value, required this.onChanged});
+  const _AccountCityPicker({
+    required this.value,
+    required this.onChanged,
+    this.trailing,
+  });
 
   final String? value;
   final ValueChanged<String?> onChanged;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -507,59 +673,66 @@ class _AccountCityPicker extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 5),
-          SizedBox(
-            height: 45,
-            child: DropdownButtonFormField<String>(
-              initialValue: selectedValue,
-              isExpanded: true,
-              menuMaxHeight: 320,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFFA3D1C6),
-              ),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                hintText: '지역을 선택해주세요',
-                hintStyle: const TextStyle(
-                  color: Color(0xFFDADADA),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF78BFAE),
-                    width: 1.4,
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 45,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: selectedValue,
+                    isExpanded: true,
+                    menuMaxHeight: 320,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Color(0xFFA3D1C6),
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: '지역을 선택해주세요',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFFDADADA),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF78BFAE),
+                          width: 1.4,
+                        ),
+                      ),
+                    ),
+                    style: const TextStyle(
+                      color: Color(0xFF333333),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0,
+                    ),
+                    items: koreaCityOptions
+                        .map(
+                          (city) => DropdownMenuItem<String>(
+                            value: city,
+                            child: Text(city, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onChanged,
                   ),
                 ),
               ),
-              style: const TextStyle(
-                color: Color(0xFF333333),
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
-              ),
-              items: koreaCityOptions
-                  .map(
-                    (city) => DropdownMenuItem<String>(
-                      value: city,
-                      child: Text(city, overflow: TextOverflow.ellipsis),
-                    ),
-                  )
-                  .toList(),
-              onChanged: onChanged,
-            ),
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            ],
           ),
         ],
       ),
@@ -571,28 +744,33 @@ class _SmallButton extends StatelessWidget {
   const _SmallButton({required this.label, required this.onPressed});
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 86,
+      width: 96,
       height: 45,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: const Color(0xFFA3D1C6),
+          disabledBackgroundColor: const Color(0xFFBDBDBD),
           foregroundColor: Colors.white,
+          disabledForegroundColor: Colors.white,
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0,
+            ),
           ),
         ),
       ),

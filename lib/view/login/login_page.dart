@@ -161,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFFEDF2F1),
       body: SafeArea(
         child: LayoutBuilder(
@@ -175,7 +175,8 @@ class _LoginPageState extends State<LoginPage> {
             const buttonFontSize = 16.0;
             const sidePadding = 20.0;
 
-            return Padding(
+            return SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.symmetric(horizontal: sidePadding),
               child: Column(
                 children: [
@@ -277,7 +278,7 @@ class _LoginPageState extends State<LoginPage> {
                     height: buttonHeight,
                     fontSize: buttonFontSize,
                   ),
-                  const Spacer(),
+                  SizedBox(height: height * 0.08),
                   Text(
                     '© 2026 라로(Life-LOG). All Rights Reserved.',
                     textAlign: TextAlign.center,

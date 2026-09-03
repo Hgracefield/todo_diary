@@ -77,7 +77,7 @@ class _CalendarDiaryState extends State<CalendarDiary> {
           contentPadding: const EdgeInsets.fromLTRB(24, 26, 24, 8),
           actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
           content: Text(
-            '당신의 역사를 작성하시겠습니까?',
+            '당신의 역사를 기록하시겠습니까?',
             style: TextStyle(
               color: Dcolor.defaultText,
               fontSize: 17,

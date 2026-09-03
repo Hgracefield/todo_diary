@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:my_todo_list_app/model/memo.dart';
 import 'package:my_todo_list_app/model/todo_category_config.dart';
+import 'package:my_todo_list_app/storage/session_storage.dart';
 import 'package:my_todo_list_app/util/dcolor.dart';
 import 'package:my_todo_list_app/util/sub_functions.dart';
 import 'package:my_todo_list_app/view/account/account_page.dart';
+import 'package:my_todo_list_app/view/memo/widgets/memo_form_dialog.dart';
 import 'package:my_todo_list_app/vm/database_handler.dart';
 
 class LifeLogHome extends StatefulWidget {
@@ -19,11 +21,15 @@ class LifeLogHome extends StatefulWidget {
 class _LifeLogHomeState extends State<LifeLogHome> {
   final db = DatabaseHandler();
   late Future<List<Memo>> _memosFuture;
+  late Future<String> _userNameFuture;
 
   @override
   void initState() {
     super.initState();
     _memosFuture = db.getAllMemos();
+    _userNameFuture = SessionStorage.loadProfile().then(
+      (profile) => profile.name.trim(),
+    );
   }
 
   void _reloadMemos() {
@@ -138,45 +144,8 @@ class _LifeLogHomeState extends State<LifeLogHome> {
               child: FutureBuilder<List<Memo>>(
                 future: _memosFuture,
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: SizedBox(
-                        width: 320,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '오늘의 생각이나 일정을 가볍게 남겨보세요.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                backgroundColor: Dcolor.stickerGreenV2,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              height: 44,
-                              child: ElevatedButton.icon(
-                                onPressed: widget.onAddMemoPressed,
-                                icon: const Icon(Icons.add, size: 20),
-                                label: const Text('메모 입력'),
-                                style: ElevatedButton.styleFrom(
-                                  elevation: 0,
-                                  backgroundColor: const Color(0xFFA3D1C6),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   final today = _todayDate();
@@ -200,9 +169,13 @@ class _LifeLogHomeState extends State<LifeLogHome> {
                         (a, b) => _memoDateTime(a).compareTo(_memoDateTime(b)),
                       );
 
+                  final hasVisibleMemos =
+                      visibleDates.isNotEmpty || futureMemos.isNotEmpty;
+
                   return ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      if (!hasVisibleMemos) _emptyDdaySection(today),
                       ...visibleDates.map(
                         (date) => _dateSection(date, grouped[date]!),
                       ),
@@ -231,6 +204,7 @@ class _LifeLogHomeState extends State<LifeLogHome> {
     String? title,
     bool showDate = true,
     bool showMemoDate = false,
+    Widget? emptyContent,
   }) {
     final sortedMemos = [...memos]
       ..sort((a, b) => _memoDateTime(a).compareTo(_memoDateTime(b)));
@@ -281,6 +255,7 @@ class _LifeLogHomeState extends State<LifeLogHome> {
               ),
             ),
           const SizedBox(height: 12),
+          if (sortedMemos.isEmpty && emptyContent != null) emptyContent,
           ...activeMemos.map(
             (memo) => _memoRow(memo, showDateLabel: showMemoDate),
           ),
@@ -294,6 +269,104 @@ class _LifeLogHomeState extends State<LifeLogHome> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _emptyDdaySection(DateTime today) {
+    return FutureBuilder<String>(
+      future: _userNameFuture,
+      builder: (context, snapshot) {
+        final userName = snapshot.data ?? '';
+        final message = userName.isEmpty
+            ? '회원님의 계획을 등록해주세요'
+            : '$userName님의 계획을 등록해주세요';
+
+        return _dateSection(
+          today,
+          const <Memo>[],
+          title: 'D-day',
+          emptyContent: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                height: 55,
+                decoration: BoxDecoration(
+                  color: todoCategoryBackgroundColor(1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      decoration: BoxDecoration(
+                        color: todoCategoryAccentColor(1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(10),
+                          bottomLeft: Radius.circular(10),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          message,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Dcolor.defaultText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: _addMemo,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: Dcolor.stickerGreen,
+                    foregroundColor: Dcolor.defaultWhite,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    '+ 등록',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _addMemo() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return MemoFormDialog(
+          initialDate: _todayDate(),
+          onSave: (text, selectedDate, selectedTime, selectedCategoryId) async {
+            await db.insertMemo(
+              text.length > 100 ? text.substring(0, 100) : text,
+              _dateKey(selectedDate),
+              selectedCategoryId,
+              time: _timeKey(selectedTime),
+            );
+
+            if (!mounted) return;
+            setState(_reloadMemos);
+          },
+        );
+      },
     );
   }
 

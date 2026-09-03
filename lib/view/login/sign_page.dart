@@ -237,6 +237,32 @@ class _SignPageState extends State<SignPage> {
         ),
       );
       if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return PopScope(
+            canPop: false,
+            child: AlertDialog(
+              content: const Text('회원가입이 완료되었습니다.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Dcolor.stickerGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      if (!mounted) return;
       Navigator.pop(context);
     } on ApiException catch (error) {
       _showMessage(
@@ -332,6 +358,7 @@ class _SignPageState extends State<SignPage> {
                 hintText: '010-1234-5678',
                 controller: phoneController,
                 keyboardType: TextInputType.phone,
+                formatAsPhoneNumber: true,
                 trailing: _DuplicateCheckButton(
                   onPressed: _checkPhoneDuplicate,
                 ),
@@ -940,6 +967,7 @@ class _SignField extends StatelessWidget {
     this.readOnly = false,
     this.onTap,
     this.suffixIcon,
+    this.formatAsPhoneNumber = false,
   });
 
   final String label;
@@ -953,6 +981,7 @@ class _SignField extends StatelessWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final Widget? suffixIcon;
+  final bool formatAsPhoneNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -982,6 +1011,7 @@ class _SignField extends StatelessWidget {
                   readOnly: readOnly,
                   onTap: onTap,
                   suffixIcon: suffixIcon,
+                  formatAsPhoneNumber: formatAsPhoneNumber,
                   height: 45,
                   fontSize: 16,
                 ),

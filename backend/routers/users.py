@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -50,8 +52,21 @@ def check_email(email: str = Query(min_length=1), db: Session = Depends(get_db))
 
 
 @router.get("/check-phone", response_model=schemas.Availability)
-def check_phone(phone: str = Query(min_length=1), db: Session = Depends(get_db)):
-    return schemas.Availability(available=not crud.phone_exists(db, phone))
+def check_phone(
+    phone: str = Query(min_length=1),
+    exclude_user_id: Optional[int] = Query(
+        default=None,
+        alias="excludeUserId",
+    ),
+    db: Session = Depends(get_db),
+):
+    return schemas.Availability(
+        available=not crud.phone_exists(
+            db,
+            phone,
+            exclude_user_id=exclude_user_id,
+        )
+    )
 
 
 @router.get("/{user_id}", response_model=schemas.UserRead)
@@ -62,6 +77,23 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
+@router.patch("/{user_id}/password", response_model=schemas.UserRead)
+def update_user_password(
+    user_id: int,
+    payload: schemas.UserPasswordUpdate,
+    db: Session = Depends(get_db),
+):
+    user = crud.get_user(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if not crud.verify_password(payload.current_password, user.user_password):
+        raise HTTPException(
+            status_code=401,
+            detail="현재 비밀번호가 일치하지 않습니다.",
+        )
+    return crud.update_user_password(db, user, payload.new_password)
+
+
 @router.patch("/{user_id}", response_model=schemas.UserRead)
 def update_user(
     user_id: int, payload: schemas.UserUpdate, db: Session = Depends(get_db)
@@ -69,7 +101,11 @@ def update_user(
     user = crud.get_user(db, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    if payload.user_phone and payload.user_phone != user.user_phone:
-        if crud.phone_exists(db, payload.user_phone):
+    if payload.user_phone:
+        if crud.phone_exists(
+            db,
+            payload.user_phone,
+            exclude_user_id=user_id,
+        ):
             raise HTTPException(status_code=409, detail="이미 사용 중인 전화번호입니다.")
     return crud.update_user(db, user, payload)

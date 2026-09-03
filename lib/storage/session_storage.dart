@@ -137,4 +137,22 @@ class AccountProfile {
     required this.phone,
     required this.address,
   });
+
+  AccountProfile copyWith({
+    String? password,
+    String? name,
+    String? birthDate,
+    String? phone,
+    String? address,
+  }) {
+    return AccountProfile(
+      userId: userId,
+      email: email,
+      password: password ?? this.password,
+      name: name ?? this.name,
+      birthDate: birthDate ?? this.birthDate,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+    );
+  }
 }

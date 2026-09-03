@@ -33,10 +33,14 @@ class UserCreate(UserBase):
 
 class UserUpdate(ApiModel):
     user_name: Optional[str] = Field(default=None, min_length=1, max_length=45)
-    user_password: Optional[str] = Field(default=None, min_length=1, max_length=255)
     user_phone: Optional[str] = Field(default=None, max_length=20)
     user_address: Optional[str] = Field(default=None, max_length=45)
     user_birth_date: Optional[date] = None
+
+
+class UserPasswordUpdate(ApiModel):
+    current_password: str = Field(min_length=1, max_length=255)
+    new_password: str = Field(min_length=1, max_length=255)
 
 
 class UserLogin(ApiModel):

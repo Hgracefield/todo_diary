@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:my_todo_list_app/util/phone_number_input_formatter.dart';
 
 class LoginTextField extends StatelessWidget {
   const LoginTextField({
@@ -17,6 +18,7 @@ class LoginTextField extends StatelessWidget {
     this.textColor,
     this.suffixIcon,
     this.obscuringCharacter = '*',
+    this.formatAsPhoneNumber = false,
   });
 
   final TextEditingController controller;
@@ -33,6 +35,7 @@ class LoginTextField extends StatelessWidget {
   final Color? textColor;
   final Widget? suffixIcon;
   final String obscuringCharacter;
+  final bool formatAsPhoneNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +52,9 @@ class LoginTextField extends StatelessWidget {
         readOnly: readOnly,
         onTap: onTap,
         onChanged: onChanged,
+        inputFormatters: formatAsPhoneNumber
+            ? const [PhoneNumberInputFormatter()]
+            : null,
         style: TextStyle(
           color: enabled
               ? textColor ?? const Color(0xFF333333)

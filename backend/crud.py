@@ -18,6 +18,12 @@ def _apply_changes(instance, changes: dict) -> None:
         setattr(instance, key, value)
 
 
+def normalize_phone(phone: Optional[str]) -> Optional[str]:
+    if phone is None:
+        return None
+    return "".join(character for character in phone if character.isdigit())
+
+
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac(
@@ -48,6 +54,7 @@ def create_user(db: Session, payload: schemas.UserCreate) -> models.User:
     now = date.today()
     values = payload.model_dump()
     values["user_password"] = hash_password(values["user_password"])
+    values["user_phone"] = normalize_phone(values.get("user_phone"))
     user = models.User(
         **values,
         user_create_at=now,
@@ -70,7 +77,7 @@ def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
 def get_user_by_name_and_phone(
     db: Session, name: str, phone: str
 ) -> Optional[models.User]:
-    normalized_phone = "".join(character for character in phone if character.isdigit())
+    normalized_phone = normalize_phone(phone)
     if not normalized_phone:
         return None
 
@@ -81,12 +88,7 @@ def get_user_by_name_and_phone(
         (
             user
             for user in users
-            if "".join(
-                character
-                for character in (user.user_phone or "")
-                if character.isdigit()
-            )
-            == normalized_phone
+            if normalize_phone(user.user_phone) == normalized_phone
         ),
         None,
     )
@@ -96,20 +98,45 @@ def email_exists(db: Session, email: str) -> bool:
     return get_user_by_email(db, email) is not None
 
 
-def phone_exists(db: Session, phone: str) -> bool:
-    return db.scalar(
-        select(models.User.user_id).where(models.User.user_phone == phone)
-    ) is not None
+def phone_exists(
+    db: Session,
+    phone: str,
+    exclude_user_id: Optional[int] = None,
+) -> bool:
+    normalized_phone = normalize_phone(phone)
+    if not normalized_phone:
+        return False
+
+    users = db.execute(
+        select(models.User.user_id, models.User.user_phone)
+    ).all()
+    return any(
+        user_id != exclude_user_id
+        and normalize_phone(user_phone) == normalized_phone
+        for user_id, user_phone in users
+    )
 
 
 def update_user(
     db: Session, user: models.User, payload: schemas.UserUpdate
 ) -> models.User:
     changes = payload.model_dump(exclude_unset=True)
-    if changes.get("user_password"):
-        changes["user_password"] = hash_password(changes["user_password"])
+    if "user_phone" in changes:
+        changes["user_phone"] = normalize_phone(changes["user_phone"])
     changes["user_updated_at"] = date.today()
     _apply_changes(user, changes)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_password(
+    db: Session,
+    user: models.User,
+    new_password: str,
+) -> models.User:
+    user.user_password = hash_password(new_password)
+    user.user_updated_at = date.today()
     db.commit()
     db.refresh(user)
     return user

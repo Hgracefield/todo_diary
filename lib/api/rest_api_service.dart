@@ -38,10 +38,13 @@ class RestApiService {
     return json['available'] == true;
   }
 
-  Future<bool> isPhoneAvailable(String phone) async {
+  Future<bool> isPhoneAvailable(String phone, {int? excludeUserId}) async {
     final json = await _apiClient.getMap(
       '/users/check-phone',
-      queryParameters: {'phone': phone},
+      queryParameters: {
+        'phone': phone,
+        if (excludeUserId != null) 'excludeUserId': excludeUserId,
+      },
     );
     return json['available'] == true;
   }
@@ -58,6 +61,23 @@ class RestApiService {
 
   Future<User> updateUser(int userId, User user) async {
     final json = await _apiClient.patch('/users/$userId', user.toJson());
+    return User.fromJson(json);
+  }
+
+  Future<User> updateUserFields(int userId, Map<String, dynamic> fields) async {
+    final json = await _apiClient.patch('/users/$userId', fields);
+    return User.fromJson(json);
+  }
+
+  Future<User> updateUserPassword({
+    required int userId,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final json = await _apiClient.patch('/users/$userId/password', {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
     return User.fromJson(json);
   }
 
